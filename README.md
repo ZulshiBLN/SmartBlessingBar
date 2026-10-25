@@ -34,7 +34,8 @@ lock state and its clicks.
 **Buff & Run** - a middle click on the blessing button blesses the player you target and then
 targets the next friendly player, so you can bless passing players by clicking again and
 again. Each gets the first blessing of his class's list he lacks, in the highest normal rank
-that fits him; one carrying a blessing of yours is passed. The game picks the next player,
+that fits him. One carrying a blessing of yours is passed, unless it is of that same kind and
+weaker than the rank you would give - then he gets the stronger one. The game picks the next player,
 sometimes one beyond the blessing's 30 yards: then the click only moves on. A click during the
 global cooldown does nothing, so nobody is skipped; in combat a click only moves on. A player
 flagged for PvP is passed too - blessing him would flag you - unless "Allow PvP blessing" is
@@ -53,8 +54,9 @@ know. In combat it keeps the aura chosen before.
 
 - Each class has a priority list, which you can change on the Priorities tab. A member gets
   the first blessing on his class's list that you know and no other paladin has given - in its
-  Greater form, or in a rank at least as high as your best. A lower rank from someone else
-  counts as missing.
+  Greater form, or in a rank at least as high as your best. A lower rank counts as missing,
+  from someone else and from you - after you learn a higher rank, or where your Greater
+  Blessing is stronger than the normal one he carries.
 - The default lists, most wanted first:
 
   | Class | Default |
@@ -71,7 +73,8 @@ know. In combat it keeps the aura chosen before.
   A low-level member therefore gets the highest rank that reaches him, and a blessing none of
   whose ranks reaches him is skipped for the next on his list.
 
-- A member is done once it carries your blessing of the kind chosen for it. One of another kind
+- A member is done once it carries your blessing of the kind chosen for it, no weaker than your
+  best that fits him. One of another kind
   is replaced - a paladin's second blessing on the same target replaces the first - so a change
   of a list is cast at once.
 - **Greater or normal:** the stronger form you know is cast. Where both are equally strong, a
@@ -102,8 +105,9 @@ than 5 minutes are left (see the Priorities tab); another paladin's counts until
 too; the bar then behaves as in combat until the game shows them again. The blessing and Salvation buttons keep the
 cast that was first when the fight started - a Greater Blessing or Mass Salvation that would be
 followed by casts that cannot happen in combat waits for the end of it; if nothing else is
-left, the button keeps its number without the highlight, and its tooltip says so. Clicking
-again casts it again. Everything updates when combat ends.
+left, the button keeps its number without the highlight, and its tooltip says so. Once a
+button's spell is cast in the fight, its highlight goes out; clicking again casts it again.
+Everything updates when combat ends, or, in an instance, once the game shows the buffs again.
 
 ## Settings
 

@@ -43,6 +43,13 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and v
   blessing, as for a rank demo mode counts as known.
 - A settings file whose version got lost keeps your aura and class priority lists; they were
   reset to the defaults.
+- Your own weaker blessing is renewed: after you learn a higher rank, and where your Greater
+  Blessing is stronger than the normal one a member carries, also through Buff & Run. Before,
+  it counted as done until it ran out.
+- A button's highlight goes out once its spell is cast in combat; it stayed on until the fight
+  ended, in an instance even longer.
+- The overview's tooltip no longer raises a Lua error in an instance, where the game may keep a
+  player's name secret: it then says "another paladin".
 - Group members' buffs, kept between reads, are checked for values the game keeps secret
   before anything else is done with them, as the game requires in combat and instances.
 
