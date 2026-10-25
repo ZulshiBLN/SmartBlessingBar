@@ -229,8 +229,8 @@ unless you choose another in the settings.
 | `Main.lua` | Startup and chat commands |
 | `Log.lua` | The bug report's action log, in memory only |
 
-`tools/decode-report.lua` (not in the release zip) reads a report code back: `lua
-tools/decode-report.lua issue.txt`.
+`tools/` (not in the release zip) holds the bug report decoder and the store screenshots' title
+tool; [tools/README.md](tools/README.md) says how to run them.
 
 Modules share code through the addon namespace (`ns`). Each file is its own Lua chunk, which keeps
 every file far below Lua's limit of 200 local variables per chunk.
@@ -297,4 +297,6 @@ This is not legal advice; it says how bug reports are handled.
 ## License
 
 MIT, see [LICENSE](LICENSE). Author: ZulshiBLN. World of Warcraft screenshots and game art are
-(c) Blizzard Entertainment and not covered by the MIT license.
+(c) Blizzard Entertainment and not covered by the MIT license. The font of the screenshots'
+titles, Cinzel, is under the SIL Open Font License ([tools/fonts/OFL.txt](tools/fonts/OFL.txt));
+it is a tool's and never ships with the addon.

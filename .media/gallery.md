@@ -1,47 +1,63 @@
 # Store gallery
 
-The seven images in `.previews/`, in this order, with the caption each gets in the CurseForge
-and Wago galleries (CurseForge allows at most 256 characters). Upload the images and paste the
-captions by hand on both sites with each release whose previews change.
+The images in `.previews/`, in this order: for each, the title `tools/preview-title.py` puts on
+it, and the caption it gets in the CurseForge and Wago galleries (CurseForge allows at most 256
+characters). Upload the images and paste the captions by hand on both sites with each release
+whose previews change. This is the 1.1.0 set of ruleset plan 2026-10-24-store-screenshots; before
+the release its phase 4 removes every entry whose image was not taken.
 
-## 01-priorities-and-group-overview.jpg
+## 01-bar-in-a-group.jpg
 
-**01 – Priorities**
+**Title:** Your whole group, one bar
+
+**01 – The bar at work**
+
+One slim bar for your group: the blessing button glows while someone still needs a blessing, counts how many are left, and its tooltip names who comes next.
+
+## 02-priorities-and-group-overview.jpg
+
+**Title:** Priorities for every class
+
+**02 – Priorities**
 
 Priorities tab: drag auras and blessings into the order you want for each class, right-click to switch one off. Below, the group overview shows everyone's blessings at a glance – here with demo mode's made-up raid.
 
-## 02-blessing-button-buff-and-run.jpg
+## 03-buff-and-run.jpg
 
-**02 – Blessing button & Buff & Run**
+**Title:** Buff & Run
 
-The blessing button casts the next blessing your group needs, Greater Blessings included. Its tooltip names the target; a middle-click (Buff & Run) blesses your current target and moves on to the next player.
+**03 – Buff & Run**
 
-## 03-general-settings.jpg
+Middle-click the blessing button: it blesses the player you target with his class's blessing and moves on to the next one – made for blessing passers-by in town.
 
-**03 – General settings**
+## 04-aura-fury-salvation.jpg
 
-General settings: language, scale and window background side by side, border and Show anchor, bar colour, orientation and growth direction, demo mode, Buff & Run and PvP blessing.
+**Title:** The right aura, Fury and Salvation
 
-## 04-eleven-languages.jpg
+**04 – Aura, Fury and Salvation**
 
-**04 – Eleven languages**
-
-Eleven languages, switched at once without a reload: English, German, French, Spanish (Spain and Mexico), Italian, Brazilian Portuguese, Russian, Korean, Simplified and Traditional Chinese.
+Tracking tab: show or hide the aura, Righteous Fury, blessing and Salvation buttons and set their highlight. The aura button casts the first aura on your list that no other paladin runs.
 
 ## 05-symbol-of-kings-autobuy.jpg
+
+**Title:** Symbols always in your bags
 
 **05 – Supplies**
 
 Supplies: warns when your Symbols of Kings run low and buys them at the vendor up to the amount you set – never spending below your gold reserve.
 
-## 06-button-order.jpg
+## 06-general-and-languages.jpg
 
-**06 – Button order**
+**Title:** Your look, eleven languages
 
-Order tab: drag the bar's four buttons – aura, Righteous Fury, blessings and Salvation – into the order you like; the top one starts the bar.
+**06 – General settings**
 
-## 07-minimap-button.jpg
+General settings: eleven languages switched at once, scale, window background, border, orientation and demo mode. The minimap button opens the settings, its middle click the priorities.
 
-**07 – Minimap button**
+## 07-bug-report.jpg
 
-Minimap button and AddOn menu: left-click opens the settings, middle-click the Priorities tab, right-click locks or unlocks the bar – the tooltip shows the new state at once. Drag to move the button around the minimap.
+**Title:** Report a bug in one click
+
+**07 – Bug report**
+
+/sbb bug writes the report for you: what happened and where, this addon's errors and its last actions, with names and file paths filtered out. "Show content" shows everything the code holds.
