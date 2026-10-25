@@ -310,14 +310,15 @@ end
 -- Blessings and Salvation renew with the Priorities tab's time
 local function Expiring(a) return B.Expiring(a, db.renewMinutes) end
 
--- The family of this paladin's blessing on a unit, normal or Greater, or nil - also when it
--- is about to run out
-local function MyBlessingOn(unit)
+-- The family and strength of this paladin's blessing on a unit, normal or Greater, or nil -
+-- also when it is about to run out, unless `evenExpiring`. A Greater rank's strength is the
+-- normal rank it equals, so the two compare (ruleset plan 2026-10-25-rank-glow-fixes).
+local function MyBlessingOn(unit, evenExpiring)
     for _, a in ipairs(B.Auras(unit)) do
         local rank = a.mine and RANKS[a.id]
         if rank and IS_BLESSING[rank.family] then
-            if Expiring(a) then return end
-            return rank.family
+            if Expiring(a) and not evenExpiring then return end
+            return rank.family, rank.strength or 0
         end
     end
 end
@@ -349,10 +350,14 @@ function B.ChosenFamily(unit, class)
 end
 
 -- Done for this paladin: my blessing on the member, normal or Greater, is of the chosen
--- family. One of another family is replaced, so a change of list is cast at once
--- (Michel, 2026-10-19).
-local function Done(chosen, mine)
-    return mine ~= nil and mine == chosen
+-- family and no weaker than my best normal rank that fits him. One of another family is
+-- replaced, so a change of list is cast at once (Michel, 2026-10-19); a weaker one of mine
+-- counts as missing, as another paladin's does (Michel, 2026-10-25). An equal strength is
+-- never weaker, so nothing is cast again and again.
+local function Done(chosen, mine, strength, unit)
+    if mine == nil or mine ~= chosen then return false end
+    local best = select(2, B.Best(D.BLESSINGS[chosen].normal, unit)) or 0
+    return strength >= best
 end
 
 -- The Greater family of a class: the one chosen for most of its members, ties by
@@ -396,9 +401,9 @@ end
 function B.PlanBlessings()
     local byClass, order = {}, {}
     for _, r in ipairs(Roster()) do
-        local mine = MyBlessingOn(r.unit)
-        local m = { unit = r.unit, chosen = B.ChosenFamily(r.unit, r.class), mine = mine }
-        m.done = Done(m.chosen, mine)
+        local mine, strength = MyBlessingOn(r.unit)
+        local m = { unit = r.unit, chosen = B.ChosenFamily(r.unit, r.class), mine = mine, strength = strength }
+        m.done = Done(m.chosen, mine, strength, r.unit)
         byClass[r.class] = byClass[r.class] or {}
         table.insert(byClass[r.class], m)
         order[#order + 1] = m
@@ -423,10 +428,12 @@ function B.PlanBlessings()
                 m.fitsGreater = B.Fits(spell, m.unit)
                 if m.fitsGreater then
                     if m.chosen and m.chosen ~= family then exceptions = true end
+                    -- Mine of the family counts unless it is weaker than this Greater rank
+                    local needs = m.chosen == family and not (m.mine == family and m.strength >= greaterStrength)
                     if B.InRange(spell, m.unit) then
                         target = target or m.unit
-                        if m.chosen == family and m.mine ~= family then lacking = lacking + 1 end
-                    elseif m.chosen == family and m.mine ~= family then
+                        if needs then lacking = lacking + 1 end
+                    elseif needs then
                         farHere = farHere + 1
                     end
                 end
@@ -563,7 +570,8 @@ function B.Describe(unit, class)
         end
     end
     local chosen = B.ChosenFamily(unit, class)
-    if chosen and not Done(chosen, MyBlessingOn(unit)) then
+    local mine, strength = MyBlessingOn(unit)
+    if chosen and not Done(chosen, mine, strength, unit) then
         local f = D.BLESSINGS[chosen]
         d.next = { family = chosen, spell = B.Best(f.normal, unit) or B.Best(f.greater) }
     end
@@ -655,18 +663,11 @@ end
 -- Buff & Run (ruleset plan 2026-10-20-buff-and-run): what the blessing button's middle click
 -- casts on its target, any friendly player. Out of combat only.
 ---------------------------------------------------------------------------
--- Whether the unit carries a blessing of mine, normal or Greater, also one running out: a
--- second would replace it. Salvation and auras take no blessing slot and do not count.
-function B.HasMyBlessing(unit)
-    for _, a in ipairs(B.Auras(unit)) do
-        if a.mine and RANKS[a.id] then return true end
-    end
-    return false
-end
-
--- The spell for the unit: nil unless it is a friendly player, alive and in reach, carrying
--- no blessing of mine; else the first family of his class's list another paladin has not
--- given, in the best normal rank that fits him - Greater Blessings reach group members only
+-- The spell for the unit: nil unless it is a friendly player, alive and in reach; else the
+-- first family of his class's list another paladin has not given, in the best normal rank
+-- that fits him - Greater Blessings reach group members only. A blessing of mine on him,
+-- also one running out, stops it: one of another family is kept, one of this family unless
+-- it is weaker than that rank (Michel, 2026-10-25). Salvation and auras do not count.
 function B.BuffRunSpell(unit)
     if not B.AurasReadable() then return end
     if not (UnitIsPlayer(unit) and UnitCanAssist("player", unit) and B.Eligible(unit)) then return end
@@ -678,12 +679,13 @@ function B.BuffRunSpell(unit)
        and not (UnitIsPVP("player") and not IsPVPTimerRunning()) then
         return
     end
-    if B.HasMyBlessing(unit) then return end
+    local mine, strength = MyBlessingOn(unit, true)
     local list = db.classLists[select(2, UnitClass(unit))]
     if not list then return end
     for _, family in ipairs(list.order) do
-        local spell = B.Best(D.BLESSINGS[family].normal, unit)
+        local spell, best = B.Best(D.BLESSINGS[family].normal, unit)
         if spell and not B.GivenByOthers(unit, family) then
+            if mine and (mine ~= family or strength >= best) then return end
             if B.InRange(spell, unit) then return spell end
             return
         end
