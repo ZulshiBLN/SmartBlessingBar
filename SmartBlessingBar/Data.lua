@@ -217,6 +217,9 @@ D.WINDOW_OPACITY_TODAY = 60
 -- Seconds a group member's buffs are kept between refreshes (ruleset plan
 -- 2026-10-24-kept-snapshots); his UNIT_AURA drops them sooner
 D.SNAPSHOT_MAX_AGE = 10
+-- Seconds a left click on a button counts for a cast in combat whose spell ID the client keeps
+-- secret (ruleset plan 2026-10-25-rank-glow-fixes)
+D.CAST_PRESS_WINDOW = 1
 D.ANTS_SPEED_MIN, D.ANTS_SPEED_MAX = 1, 5
 D.BOOL_DEFAULTS = {
     showBorder = true, vertical = false, growRev = false, hideCombat = false,

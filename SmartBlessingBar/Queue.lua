@@ -65,6 +65,11 @@ local salvation = NewQueueButton("SmartBlessingBarSalvation", "salvationAntsColo
     "salvationAntsSpeed", D.SALVATION, SalvationName)
 ns.blessingButton, ns.salvationButton = blessing, salvation
 
+-- A cast of the head in combat ends that button's glow (Bar.lua)
+for _, b in ipairs({ blessing, salvation }) do
+    ns.WatchCast(b, function(id) return b.head ~= nil and b.head.spell == id end)
+end
+
 -- Buff & Run (ruleset plan 2026-10-20-buff-and-run): the blessing button's middle click casts
 -- on the current target what B.BuffRunSpell chose for him, then targets the next friendly
 -- player - one macro, as the client lets an addon pick neither spell nor target during a
@@ -181,7 +186,15 @@ local function ArmBuffKey()
     for _, attr in ipairs(ACTION) do
         SetAttr(buffKey, attr, source and source:GetAttribute(attr) or nil)
     end
+    -- Out of combat only, as the attributes: in combat the key keeps the action it had
+    if not InCombatLockdown() then buffKey.source = source end
 end
+
+-- A press of the key counts as a left click on the button whose action it carries, for a cast
+-- in combat whose spell ID the client keeps secret (Bar.lua)
+buffKey:HookScript("OnClick", function(self, mouseButton)
+    if mouseButton == "LeftButton" and self.source then self.source.pressedAt = GetTime() end
+end)
 
 -- Demo mode casts nothing; a press says once, on the release, what it would cast
 buffKey:HookScript("OnClick", function(self, _, down)

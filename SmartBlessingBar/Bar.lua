@@ -124,6 +124,8 @@ end
 
 -- Shows or hides a button's highlight and starts or stops its animation
 function ns.SetAnts(b, shown)
+    -- A button cast in combat stays dark until the planners read the group again
+    if b.cast then shown = false end
     if shown == b.antsShown then return end
     b.antsShown = shown
     if shown then
@@ -419,6 +421,8 @@ function ns.Refresh(combatStart)
     -- The planners read auras: not while the client keeps them secret, then the buttons keep
     -- what they had (third release review: the layout and settings must not wait for it)
     if not readable then return end
+    -- The planners see what was cast in combat: the marks of those casts go
+    for _, w in ipairs(ns.castWatch) do w.button.cast = nil end
     -- One read of the group for every planner and the overview
     ns.Blessings.WithRead(function()
         for _, fn in ipairs(ns.onRefresh) do fn(combatStart) end
@@ -435,6 +439,56 @@ local function Schedule()
         ns.Refresh()
     end)
 end
+
+---------------------------------------------------------------------------
+-- A cast in combat ends its button's glow (ruleset plan 2026-10-25-rank-glow-fixes). Auras are
+-- unreadable in combat and the refresh waits for its end; the cast event says what was cast.
+-- Count, secure action and buff key stay: nothing secure changes in combat.
+---------------------------------------------------------------------------
+ns.castWatch = {} -- { button, matches(spellId) }
+local inCombat = false -- InCombatLockdown() is still false while PLAYER_REGEN_DISABLED runs
+
+-- A button whose glow a cast of `matches` ends; its left clicks are remembered for a cast
+-- whose spell ID the client keeps secret
+function ns.WatchCast(b, matches)
+    ns.castWatch[#ns.castWatch + 1] = { button = b, matches = matches }
+    b:HookScript("OnClick", function(_, mouseButton)
+        if mouseButton == "LeftButton" then b.pressedAt = GetTime() end
+    end)
+end
+
+local function MarkCast(b)
+    b.cast = true
+    ns.SetAnts(b, false)
+end
+
+local casts = CreateFrame("Frame")
+casts:RegisterEvent("PLAYER_REGEN_DISABLED")
+casts:RegisterEvent("PLAYER_REGEN_ENABLED")
+casts:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+casts:SetScript("OnEvent", function(_, event, unit, _, spellId)
+    if event ~= "UNIT_SPELLCAST_SUCCEEDED" then
+        inCombat = event == "PLAYER_REGEN_DISABLED"
+        return
+    end
+    if unit ~= "player" or not inCombat then return end
+    if issecretvalue(spellId) then
+        -- The button left-clicked last, within the window - a press early in a fight must not
+        -- match a cast much later
+        local latest
+        for _, w in ipairs(ns.castWatch) do
+            local at = w.button.pressedAt
+            if at and GetTime() - at <= D.CAST_PRESS_WINDOW and (not latest or at > latest.button.pressedAt) then
+                latest = w
+            end
+        end
+        if latest then MarkCast(latest.button) end
+        return
+    end
+    for _, w in ipairs(ns.castWatch) do
+        if w.matches(spellId) then MarkCast(w.button) end
+    end
+end)
 
 local events = CreateFrame("Frame")
 for _, event in ipairs({ "GROUP_ROSTER_UPDATE", "UNIT_AURA", "SPELLS_CHANGED", "BAG_UPDATE_DELAYED",
