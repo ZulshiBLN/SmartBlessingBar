@@ -249,6 +249,8 @@ describe("the report's privacy", function()
             { "Testplayer\204\129 x", { "Testplayer" }, "<name> x" },           -- U+0301
             { "Test\205\143player x", { "Test" }, "<name> x" },                 -- U+034F
             { "Test\227\133\164player x", { "Test" }, "<name> x" },             -- U+3164
+            { "Test\240\147\145\128player x", { "Test" }, "<name> x" },         -- U+13440
+            { "Test\240\147\145\149player x", { "Test" }, "<name> x" },         -- U+13455
         }
         -- an error text with hundreds of paths on one line: no stack overflow, every path gone
         local many = ns.Scrub(("C:\\a.lua:1: "):rep(400) .. ("\\\\:1"):rep(300), names)

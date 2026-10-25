@@ -67,8 +67,11 @@ local function ShowIconTooltip(slot)
     if c then
         local giver = c.by
         if not giver then
+            -- In an instance a name can be secret: asked first, and then "another paladin"
+            -- (ruleset plan 2026-10-25-rank-glow-fixes)
             local unit = c.source and B.InGroup(c.source)
-            giver = unit and (UnitName(unit))
+            local name = unit and (UnitName(unit))
+            if not issecretvalue(name) and name then giver = name end
         end
         GameTooltip:AddLine(L.OV_FROM:format(giver or L.OV_ANOTHER), 1, 1, 1)
         if c.expires > 0 then

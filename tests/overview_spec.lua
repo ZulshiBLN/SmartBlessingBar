@@ -240,6 +240,12 @@ describe("the overview", function()
         assert.are.equal(D.SALVATION, spell)
         assert.are.same({ ns.L.OV_FROM:format(ns.L.OV_ANOTHER) }, lines)
         assert.are.same({}, STATE.errors)
+        -- In an instance the giver's name can be secret: he is "another paladin" (ruleset plan
+        -- 2026-10-25-rank-glow-fixes)
+        STATE.secrets = { Tyr = true }
+        lines = select(2, tip("KINGS"))
+        assert.are.same({ ns.L.OV_FROM:format(ns.L.OV_ANOTHER), ns.L.OV_LEFT:format(10) }, lines)
+        assert.are.same({}, STATE.errors)
     end)
 
     it("shows twenty members without scrolling, the 21st makes it scroll", function()

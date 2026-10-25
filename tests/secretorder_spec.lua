@@ -63,6 +63,9 @@ describe("secret values", function()
         local loop = region(known, "local name, realm = UnitName(u)", "^    end")
         assertCheckedFirst(loop, "name", "KnownNames' name and realm")
         assertCheckedFirst(loop, "realm", "KnownNames' name and realm")
+        -- The overview's giver (ruleset plan 2026-10-25-rank-glow-fixes)
+        assertCheckedFirst(region(source("Overview.lua"), "local function ShowIconTooltip", "^end"), "name",
+            "the overview's giver")
     end)
 
     -- The 1.1.0 review's F-05: a secret instance ID must not become a table key, and the mock

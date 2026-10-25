@@ -181,7 +181,7 @@ describe("the decoder", function()
     it("shows the remaining format characters, and surrogates and code points past U+10FFFF as bytes", function()
         local RC = codec()
         for _, cp in ipairs({ 0x600, 0x605, 0x6DD, 0x70F, 0x890, 0x891, 0x8E2, 0x2065, 0xFFF0, 0xFFF8,
-            0x110BD, 0x110CD, 0x13430, 0x1343F, 0x1BCA0, 0x1BCA3, 0x1D173, 0x1D17A }) do
+            0x110BD, 0x110CD, 0x13430, 0x1343F, 0x13440, 0x13455, 0x1BCA0, 0x1BCA3, 0x1D173, 0x1D17A }) do
             local code, out = run(RC.Encode("x" .. utf8(cp) .. "y"))
             assert.are.equal(0, code)
             assert.are.equal(("x<U+%04X>y"):format(cp), out)
