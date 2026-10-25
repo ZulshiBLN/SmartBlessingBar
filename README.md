@@ -4,6 +4,8 @@ A paladin blessing manager for **WoW Forever** (Classic content on the modern Re
 Interface 16001): it blesses your group by class, works around what other paladins already gave,
 and casts Salvation, auras and Righteous Fury, with a modern look.
 
+![The bar, the handle's tooltip and the settings' General tab](.previews/03-general-settings.jpg)
+
 Exceptions for single characters come later.
 
 ## Installation
@@ -41,6 +43,8 @@ global cooldown does nothing, so nobody is skipped; in combat a click only moves
 flagged for PvP is passed too - blessing him would flag you - unless "Allow PvP blessing" is
 on, or you are flagged for good yourself (/pvp, the portrait menu, a battleground, an arena or
 a PvP zone; a flag that runs out does not count). Both are switched on the General tab.
+
+![The blessing button's tooltip with its clicks, beside the Tracking tab](.previews/02-blessing-button-buff-and-run.jpg)
 
 **Auras** come from a priority list on the Priorities tab, so paladins need not agree who runs
 which: the button casts the first aura on your list that you know and no other paladin of your
@@ -165,6 +169,8 @@ closes when combat starts and opens again when combat ends. Every change takes e
   them, tanks and healers, a few members dimmed or without Salvation, and names from 2 to 12
   letters, one cut and one just fitting its place.
 
+![The Priorities tab with the class lists and the overview of demo mode's raid](.previews/01-priorities-and-group-overview.jpg)
+
 **Order**
 - Drag the rows to reorder the bar's four buttons. "Default" restores aura, Righteous Fury,
   blessings, Salvation.
@@ -174,6 +180,14 @@ closes when combat starts and opens again when combat ends. Every change takes e
 
 **Minimap button** - left click opens the settings, right click locks or unlocks the bar, middle
 click opens the Priorities tab, drag moves it around the minimap.
+
+| Supplies, with Symbol of Kings auto-buy | Order, the bar's buttons |
+|---|---|
+| ![Supplies tab](.previews/05-symbol-of-kings-autobuy.jpg) | ![Order tab](.previews/06-button-order.jpg) |
+
+| Eleven languages, switched at once | The minimap button |
+|---|---|
+| ![The language list on the General tab](.previews/04-eleven-languages.jpg) | ![The minimap button's tooltip](.previews/07-minimap-button.jpg) |
 
 **Bug report** - `/sbb bug` or "Report bug" opens a short form: what happened, where, and
 details. The window turns it, with what the addon knows - its errors from BugSack, if
