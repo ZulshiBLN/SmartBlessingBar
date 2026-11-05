@@ -192,61 +192,209 @@ end
 -- end, spaces included ("C:\Users\First Last\..."). Its line number stays readable, and the
 -- rest of the line stays for the next round: it may hold a second path. A replaced path holds
 -- no root, so the rounds end; a loop, not a recursion, so hundreds of paths overflow nothing.
+-- The lower-case "users" and "account" need a second separator in the word: "users/players" in
+-- a sentence is no folder. The first two roots can leave any folder, so they count everywhere;
+-- the others do not inside an addon's own path, where "media/" or "opt/" are its folders.
 local HOME_ROOTS = { "%f[%a]%a:[\\/]", "\\\\", "/Users/", "/home/", "/Volumes/", "/Applications/",
-    "/run/media/", "/media/", "%f[%w]Users[\\/]" }
-local function Path(p)
-    local s = p:find(":%d+")
-    if not s then return "<path>" end
-    return "<path>" .. p:sub(s)
+    "/run/media/", "/media/", "/mnt/", "/opt/", "~/", "/users/", "%f[%w]Users[\\/]",
+    "%f[%w]users[\\/][^\\/%s]+[\\/]", "%f[%w][Aa]ccount[\\/][^\\/%s]+[\\/]" }
+local ROOTS_EVERYWHERE = 2
+
+-- The first line number in text[from, stop); a port is none: "\\srv:445\share"
+local function LineNumber(text, from, stop)
+    while true do
+        local s, e = text:find(":%d+", from)
+        if not s or s >= stop then return nil end
+        if not text:sub(e + 1, e + 1):find("[\\/]") then return s end
+        from = e + 1
+    end
 end
 
-function ns.Scrub(text, names)
-    text = Visible(tostring(text or ""))
-    -- A path ends at Interface/AddOns, whatever drive or folder the game sits in
-    text = text:gsub("%a:[\\/][^%[%]\"'\n]-[\\/][Ii]nterface[\\/][Aa]dd[Oo]ns[\\/]", "Interface/AddOns/")
-    text = text:gsub("Interface[\\/]AddOns[\\/][^%]%s\"']*", function(p) return (p:gsub("\\", "/")) end)
-    -- after each change from the first root again, so "/Users/" is never taken for "Users/"
-    local i = 1
-    while i <= #HOME_ROOTS do
-        local after = text:gsub(HOME_ROOTS[i] .. "[^%[%]\"'\n]*", Path)
-        if after ~= text then text, i = after, 1 else i = i + 1 end
+-- Where each addon path of the text runs: to a space, bracket, quote or other separator, "..",
+-- "//", or a colon a new path follows: past those another folder can begin
+local function AddonRuns(text)
+    local runs, from = {}, 1
+    while true do
+        local s, e = text:find("Interface/AddOns/", from, true)
+        if not s then return runs end
+        local stop = text:find("[%]%s\"',;%(]", e + 1) or #text + 1
+        local run = text:sub(e + 1, stop - 1)
+        for _, inner in ipairs({ "%.%.", "//", ":[\\/~]" }) do
+            local at = run:find(inner)
+            if at and e + at < stop then stop = e + at end
+        end
+        runs[#runs + 1] = { s, stop }
+        from = stop
     end
-    text = text:gsub("%f[%a][Ww][Tt][Ff][\\/][^%[%]\"'\n]*", "<wtf>")
+end
+
+-- A path runs to a bracket, the line's end or a quote that ends it: an apostrophe with a letter,
+-- digit or separator after it is part of a name ("O'Brien")
+local function PathEnd(text, i)
+    while i <= #text do
+        local stop = text:find("[%[%]\n\"']", i)
+        if not stop then return #text + 1 end
+        local c = text:sub(stop, stop)
+        if (c ~= '"' and c ~= "'") or not text:sub(stop + 1, stop + 1):find("[%w\\/]") then return stop end
+        i = stop + 1
+    end
+    return i
+end
+
+-- Every path from this root replaced by `label`, in one pass over the text. With keepLines a line
+-- number stays readable and the rest of the line stays too: it may hold a second path. Runs, if
+-- given, are left alone.
+local function ReplaceRoot(text, root, label, keepLines, runs)
+    local out, pos, from, r, stop = {}, 1, 1, 1, 0
+    while true do
+        local s, e = text:find(root, from)
+        if not s then break end
+        while runs and runs[r] and runs[r][2] <= s do r = r + 1 end
+        if runs and runs[r] and runs[r][1] < s then
+            from = s + 1
+        else
+            if stop <= e then stop = PathEnd(text, e + 1) end -- one scan for all paths up to the end
+            out[#out + 1] = text:sub(pos, s - 1)
+            out[#out + 1] = label
+            pos = keepLines and LineNumber(text, e + 1, stop) or stop
+            from = pos
+        end
+    end
+    if pos == 1 then return text end
+    out[#out + 1] = text:sub(pos)
+    return table.concat(out)
+end
+
+-- A display code the game would draw: the report shows and copies text, and in text a code hides
+-- what stands beside it. It leaves a marker that ends a word, so taking it out joins no two
+-- words into a name that was none. A pair only up to its last closing code: without one, each
+-- opening code would scan the rest of the text.
+local MARK = "\1"
+local function Pairs(text, open, close)
+    local last, from = nil, 1
+    while true do
+        local s, e = text:find(close, from, true)
+        if not s then break end
+        last, from = e, e + 1
+    end
+    if not last then return text end
+    return text:sub(1, last):gsub(open .. "[^\n]-" .. close, MARK) .. text:sub(last + 1)
+end
+
+local function WithoutCodes(text)
+    if not text:find("|", 1, true) then return text end
+    text = text:gsub("|n", " ")
+    -- a link's payload may hold a name no filter knows, so only its visible text stays
+    text = Pairs(text, "|H", "|h")
+    text = text:gsub("|H[^\n]*", MARK):gsub("|h", MARK)
+    text = Pairs(text, "|T", "|t")
+    text = Pairs(text, "|A", "|a")
+    text = Pairs(text, "|K", "|k")
+    return (text:gsub("|[cC]%x%x%x%x%x%x%x%x", MARK):gsub("|[cC]n[%w_]+:", MARK):gsub("|[rR]", MARK))
+end
+
+-- An address without a dot in its domain: letters only, no unit token ("x@focus"), and nothing
+-- that makes it a file or a version after it ("Ace3@r1234", "foo@Interface/AddOns")
+local UNIT_TOKENS = { player = true, target = true, targettarget = true, focus = true, mouseover = true,
+    pet = true, none = true, cursor = true, vehicle = true }
+local function WithoutDotlessAddress(text)
+    return (text:gsub("%f[%w%.%%%+%-_\128-\255][%w%.%%%+%-_\128-\255]+@([%a\128-\255]+)()", function(domain, after)
+        if UNIT_TOKENS[domain:lower()] or text:sub(after, after):find("[%w_/\\\1]") then return nil end
+        return "<email>"
+    end))
+end
+
+-- A name written with combining marks reaches the name filter without them, so it is also looked
+-- for without its accents - but only then: on any other text "B\195\161r" would take "Bar.lua".
+local BASE_LETTERS = { A = "\128\129\130\131\132\133", C = "\135", E = "\136\137\138\139", I = "\140\141\142\143",
+    N = "\145", O = "\146\147\148\149\150", U = "\153\154\155\156", Y = "\157",
+    a = "\160\161\162\163\164\165", c = "\167", e = "\168\169\170\171", i = "\172\173\174\175",
+    n = "\177", o = "\178\179\180\181\182", u = "\185\186\187\188", y = "\189\191" }
+local BASE = {}
+for base, seconds in pairs(BASE_LETTERS) do
+    for i = 1, #seconds do BASE["\195" .. seconds:sub(i, i)] = base end
+end
+local function BaseForm(name) return (name:gsub("\195.", BASE)) end
+
+local function Filter(text, names, marked)
+    text = WithoutCodes(Visible(text))
+    -- A path ends at Interface/AddOns, whatever drive or folder the game sits in
+    text = text:gsub("%a:[\\/][^%[%]\"\n]-[\\/][Ii]nterface[\\/][Aa]dd[Oo]ns[\\/]", "Interface/AddOns/")
+    text = text:gsub("Interface[\\/]AddOns[\\/][^%]%s\"']*", function(p) return (p:gsub("\\", "/")) end)
+    -- in this order, so "/Users/" is never taken for "Users/"
+    for i, root in ipairs(HOME_ROOTS) do
+        text = ReplaceRoot(text, root, "<path>", true, i > ROOTS_EVERYWHERE and AddonRuns(text) or nil)
+    end
+    text = ReplaceRoot(text, "%f[%a][Ww][Tt][Ff][\\/]", "<wtf>")
     -- The frontier starts a match only where a run of address characters starts: without it a
-    -- long run of non-ASCII text would be scanned again from every byte
-    text = text:gsub("%f[%w%.%%%+%-_\128-\255][%w%.%%%+%-_\128-\255]+@[%w%-]+%.[%w%.%-]+", "<email>")
+    -- long run would be scanned again from every byte
+    text = text:gsub("%f[%w%.%%%+%-_\128-\255][%w%.%%%+%-_\128-\255]+@[%w%-\128-\255]+%.[%w%.%-\128-\255]+", "<email>")
+    text = WithoutDotlessAddress(text)
     for _, kind in ipairs(GUID_KINDS) do
         text = text:gsub(kind .. "%-%d+%-[%x%-]+", "<guid>")
     end
-    -- a frontier as for e-mail: a match starts only where a run starts
-    text = text:gsub("%f[^%s#<>\"'=%[%]][^%s#<>\"'=%[%]]+#%d%d%d%d+", "<tag>")
+    -- a frontier as for e-mail: a match starts only where a run starts; %z, because the frontier
+    -- sees the start of the text as a zero byte, which the set would otherwise hold
+    text = text:gsub("%f[^%z%s#<>\"'=%[%]][^%s#<>\"'=%[%]]+#%d%d%d%d+", "<tag>")
     text = text:gsub("%f[%d]%d+#%d+", "<tag>") -- an account folder, "12345678#1"
     local low = Fold(text)
-    for _, name in ipairs(names or {}) do text, low = ReplaceName(text, low, name) end
-    return text
+    for _, name in ipairs(names or {}) do
+        text, low = ReplaceName(text, low, name)
+        if marked then
+            local base = BaseForm(name)
+            if base ~= name then text, low = ReplaceName(text, low, base) end
+        end
+    end
+    return (text:gsub(MARK, ""))
+end
+
+-- Enough for codes nested in codes: a crafted line could nest deeper, but costs the same each pass
+local MAX_PASSES = 8
+
+function ns.Scrub(text, names)
+    text = tostring(text or ""):gsub(MARK, "")
+    local marked = text:find("\204[\128-\191]") or text:find("\205[\128-\175]")
+    local out = Filter(text, names, marked)
+    -- Data a display code split is whole only now: "Tes|rta", "joe@exa|rmple.de"
+    if text:find("|", 1, true) then
+        for _ = 2, MAX_PASSES do
+            local again = Filter(out, names, marked)
+            if again == out then break end
+            out = again
+        end
+    end
+    return out
 end
 
 ---------------------------------------------------------------------------
--- Locals: BugGrabber's text, one "name=value" per line, strings unescaped. Each line is rebuilt
--- from its parts; a line that does not parse is dropped.
+-- Locals: BugGrabber's text, one "name=value" per line, strings unescaped.
+-- Each line is rebuilt from its parts; a line that does not parse is dropped.
 ---------------------------------------------------------------------------
 local MAX_LOCALS = 20
+local LOCAL_KINDS = { table = true, ["function"] = true, userdata = true, thread = true, unnamed = true }
 
 local function SafeLocalValue(v)
     if v:find('^".*"$') and #v >= 2 then return '"' .. ns.SafeValue(v:sub(2, -2)) .. '"' end
     if v:find("^%-?%d+%.?%d*$") or v == "true" or v == "false" or v == "nil" then return v end
     local kind = v:match("^<(%a+)>")
-    if kind then return "<" .. kind .. ">" .. (v:find("{%s*$") and " {" or "") end
+    if LOCAL_KINDS[kind] then return "<" .. kind .. ">" .. (v:find("{%s*$") and " {" or "") end
     if v:find("{%s*$") then return "<table> {" end -- a frame or table printed by its name
     return nil
 end
 
 function ns.SafeLocals(text, names)
     local out = {}
+    -- BugGrabber's strings are unescaped, so a line of one could read as a local. A string line
+    -- that itself ends in a quote closes it early: that much cannot be told from the text.
+    local inString = false
     for line in tostring(text or ""):gmatch("[^\n]+") do
         if #out >= MAX_LOCALS then break end
         local indent, key, value = line:match("^(%s*)([^=]-)%s*=%s*(.-)%s*$")
-        if line:find("^%s*}%s*$") then
+        if inString then
+            inString = not line:find('"%s*$')
+        elseif value and value:sub(1, 1) == '"' and (#value < 2 or value:sub(-1) ~= '"') then
+            inString = true
+        elseif line:find("^%s*}%s*$") then
             out[#out + 1] = line:match("^%s*") .. "}"
         elseif key and key ~= "" then
             local safeKey

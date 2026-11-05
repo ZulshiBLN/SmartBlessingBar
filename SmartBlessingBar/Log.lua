@@ -74,7 +74,7 @@ local function LogClicks(b, label, downOnly)
             return
         end
         local suffix = SUFFIX[mouse] or ""
-        local parts = { "click", label, tostring(mouse) }
+        local parts = { "click", label, SUFFIX[mouse] and mouse or "other" }
         for _, a in ipairs({ "type", "spell", "unit" }) do
             local v = Attr(self, a, suffix)
             if v ~= nil then parts[#parts + 1] = a .. "=" .. ns.SafeValue(v) end

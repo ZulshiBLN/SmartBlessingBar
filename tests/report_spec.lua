@@ -661,3 +661,166 @@ describe("the bug report window", function()
         assert.is_true(found)
     end)
 end)
+
+
+-- Exact outputs (ruleset plan 2026-11-05-report-filter-guards, from SimpleConjureBar's audits)
+describe("the report's filter, by exact output", function()
+    local ELODIE = "\195\137lodie"
+    local function check(rows, names)
+        local ns = login(nil)
+        for _, row in ipairs(rows) do
+            assert.are.equal(row[2], ns.Scrub(row[1], names or { "Testa", ELODIE }), row[1])
+        end
+    end
+
+    it("finds a BattleTag at the start of a text", function()
+        check({
+            { "Fakejoe#1234 told me", "<tag> told me" },
+            { "(Fakejoe#1234)", "<tag>)" },
+            { "\208\153\208\190\209\131#1234", "<tag>" },
+            { "x:Joe#1234", "<tag>" },
+        })
+    end)
+
+    it("finds a BattleTag first in the description, a message and a stack line", function()
+        local ns = login()
+        grabber({ ourError(time(), 1, { message = "Interface/AddOns/SmartBlessingBar/Bar.lua:1: x\nFakejoe#1234 sent this",
+            stack = "Interface/AddOns/SmartBlessingBar/Bar.lua:1: x\nFakeann#1234 in stack" }) }, 1)
+        local text = build(ns, "OTHER", "Fakejoe#1234 told")
+        assert.is_truthy(text:find("**Description:** <tag> told", 1, true), text)
+        assert.is_truthy(text:find("msg <tag> sent this", 1, true), text)
+        assert.is_truthy(text:find("at <tag> in stack", 1, true), text)
+    end)
+
+    it("takes display codes out, and finds what they hid or split", function()
+        check({
+            { "|cffc41f3bTesta|r failed", "<name> failed" },
+            { "|cFFFFD100" .. ELODIE .. "|r failed", "<name> failed" },
+            { "|TInterface\\Icons\\x:16|tTesta", "<name>" },
+            { "line|nTesta", "line <name>" },
+            { "Water|nFood", "Water Food" },
+            { "abc|cffc41f3bTesta|r failed", "abc<name> failed" },
+            { "|cffc41f3bTesta|rfoo", "<name>foo" },
+            { "Tes|rta", "<name>" },
+            { "|cffffffffTes|r|cffffffffta|r failed", "<name> failed" },
+            { "joe@exa|rmple.de", "<email>" },
+            { "/ho|rme/joe/x", "<path>" },
+            { "Player-1|r-0AAAAAAA", "<guid>" },
+            { "|Hplayer:Unknownguy-Realm:1|h[click]|h", "[click]" },
+            { "|Hplayer:Unknownguy-Realm:1", "" },
+            { "|Hplayer:Unknownguy|h", "" },
+            { "|cff000000hidden text|r", "hidden text" },
+            { "|c|cffffffffffffffffTesta", "<name>" },
+            { "|Kq1|k", "" },
+            { "|cnGREEN_FONT_COLOR:Testa|r", "<name>" },
+            { "a | b", "a | b" },
+            { "on|off", "on|off" },
+            { "left|right", "leftight" },
+            { "x|Ty and z|t", "x" },
+            { "see |Hello and more text", "see " },
+            { "|Tjoe.blp", "|Tjoe.blp" },
+        })
+    end)
+
+    it("handles paths with an apostrophe, new roots and other addons' folders", function()
+        check({
+            { "C:\\Users\\O'Brien\\AppData\\x.lua:3: bad", "<path>:3: bad" },
+            { "'C:\\Users\\O'Brien\\a.lua'", "'<path>'" },
+            { "D:\\Jo's Games\\WoW\\Interface\\AddOns\\Foo\\a.lua:5", "Interface/AddOns/Foo/a.lua:5" },
+            { "x\\WTF\\Account\\JOE's\\y", "x\\<wtf>" },
+            { "\\\\srv:445\\joe\\share", "<path>" },
+            { "users\\joe\\x", "<path>" },
+            { "/users/joe/x", "<path>" },
+            { "/mnt/data/joe/x", "<path>" },
+            { "/opt/joe/x", "<path>" },
+            { "~/joe/x", "<path>" },
+            { "some users/players lag here", "some users/players lag here" },
+            { "users/players and foo/bar lag", "users/players and foo/bar lag" },
+            { "Interface/AddOns/Foo/Account/Data/a.lua:5: bad", "Interface/AddOns/Foo/Account/Data/a.lua:5: bad" },
+            { "Interface/AddOns/Foo/opt/a.lua:5: bad", "Interface/AddOns/Foo/opt/a.lua:5: bad" },
+            { "Interface/AddOns/Foo/users/lists/a.lua:5: bad", "Interface/AddOns/Foo/users/lists/a.lua:5: bad" },
+            { "Interface/AddOns/Foo/media/a.lua:5: bad", "Interface/AddOns/Foo/media/a.lua:5: bad" },
+            { "/media/janeroe/x", "<path>" },
+            { "/run/media/janeroe/x", "<path>" },
+            { "/home/joe/Interface/AddOns/Foo/a.lua:3", "<path>:3" },
+            { "Interface/AddOns/Foo/../../Users/joe/x", "Interface/AddOns/Foo/../..<path>" },
+            { "Interface/AddOns/Foo/a.lua:C:\\Users\\joe\\x", "Interface/AddOns/Foo/a.lua:<path>" },
+            { "C:\\Users\\Chris' PC\\a.lua:3: bad", "<path>' PC\\a.lua:3: bad" },
+            { "Account\\JOEACC\\SavedVariables\\a.lua", "<path>" },
+            { "Documents\\Joe\\x", "Documents\\Joe\\x" },
+            { "Interface/AddOns/Foo/a.lua:1:/home/joe/x", "Interface/AddOns/Foo/a.lua:1:<path>" },
+            { "Interface/AddOns/Foo,/Users/joe/x", "Interface/AddOns/Foo,<path>" },
+            { "Interface/AddOns/Foo/a.lua:1(/Users/joe/x)", "Interface/AddOns/Foo/a.lua:1(<path>" },
+            { "Interface/AddOns/Foo/a.lua:1;/home/joe Smith/x", "Interface/AddOns/Foo/a.lua:1;<path>" },
+            { "Interface\\AddOns\\Bar\\/Users/amy/x", "Interface/AddOns/Bar/<path>" },
+        })
+    end)
+
+    it("takes capital codes, nested codes and a marker byte in the input out too", function()
+        check({
+            { "|CffffffffTesta|R failed", "<name> failed" },
+            { "Te|c|rffffffffsta failed", "<name> failed" },
+            { "/ho|c|rffffffffme/joe/x", "<path>" },
+            { "joe@exa|c|rffffffffmple.de", "<email>mple.de" }, -- nothing of the address is left
+            { "Tes\1ta failed", "<name> failed" },
+            { "joe@exa\1mple.de", "<email>" },
+        })
+    end)
+
+    it("finds addresses without a dot, but no unit tokens or versions", function()
+        check({
+            { "joe@caf\195\169.example", "<email>" },
+            { "joe@example", "<email>" },
+            { "joe@gmail", "<email>" },
+            { "joe@caf\195\169", "<email>" },
+            { "Ace3@r1234", "Ace3@r1234" },
+            { "x@focus", "x@focus" },
+            { "x@player", "x@player" },
+            { "x@player|r", "x@player" },
+            { "[@focus,harm]", "[@focus,harm]" },
+            { "foo@Interface/AddOns/Foo/a.lua:1", "foo@Interface/AddOns/Foo/a.lua:1" },
+        })
+    end)
+
+    it("matches a name's base form only where the text held a combining mark", function()
+        check({ { "E\204\129lodie", "<name>" }, { "E\204\129lo|rdie", "<name>" } })
+        check({ { "Interface/AddOns/Foo/Bar.lua:1: Bar", "Interface/AddOns/Foo/Bar.lua:1: Bar" } }, { "B\195\161r" })
+    end)
+
+    it("scrubs long runs of display codes quickly", function()
+        local ns = login(nil)
+        for _, code in ipairs({ "|T", "|A", "|K", "|H", "|c", "|T|t", "|H|h", "~/:1", "~/x:1 ", "Account\\a\\b:1 ",
+            "users\\a\\b:1 ", "\\\\x:1 ", "Users\\x:1 ", "Interface/AddOns/a Account\\a\\b:1 " }) do
+            local start = os.clock()
+            ns.Scrub(code:rep(math.floor(20000 / #code)), { "Testplayer" })
+            local took = os.clock() - start
+            assert.is_true(took < 0.5, code .. ": " .. took .. " s")
+        end
+    end)
+end)
+
+-- The allowlisted parts (from SimpleConjureBar's audits)
+describe("the report's allowlisted parts", function()
+    it("let no name through a local's kind, nor a line inside a string", function()
+        local ns = login(nil)
+        local out = table.concat(ns.SafeLocals(table.concat({
+            "who=<Testplayer>", "Other=<Secretguy> {", "}", "self=<table> {", "}",
+            'a="x', "Secretguy = 5", 'y"', "count=3",
+        }, "\n"), {}), "\n")
+        assert.is_nil(out:find("Testplayer", 1, true), out)
+        assert.is_nil(out:find("Secretguy", 1, true), out)
+        assert.is_truthy(out:find("self=<table> {", 1, true), out)
+        assert.is_truthy(out:find("count=3", 1, true), out)
+    end)
+
+    it("log no text as a mouse button, and print no text as an error count", function()
+        local ns = login()
+        RUNCLICK(ns.blessingButton, "Clickname", true)
+        RUNCLICK(ns.blessingButton, "Clickname", false)
+        assert.is_nil(table.concat(ns.LogLines(), "\n"):find("Clickname", 1, true))
+        grabber({ ourError(time(), 1, { counter = "Leakcounter" }) }, 1)
+        local text = build(ns, "OTHER")
+        assert.is_nil(text:find("Leakcounter", 1, true), text)
+        assert.is_truthy(text:find("Error 1 (x1,", 1, true), text)
+    end)
+end)
