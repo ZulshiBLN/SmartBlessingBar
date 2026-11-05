@@ -119,6 +119,37 @@ describe("the aura button", function()
         assert.is_true(b.ants:IsShown())
     end)
 
+    -- Ruleset plan 2026-10-22-hidden-equal-aura: equal auras do not stack, the game shows mine
+    -- on him and hides his
+    it("moves on from my aura on another paladin who shows none of his own", function()
+        local mine = { spellId = D_DEV, expirationTime = 0, source = "player", mine = true }
+        local _, D, b = withAuras({ group = "party", units = { party1 = { class = "PALADIN", auras = { mine } } } })
+        assert.are.equal(D.AURAS.RETRIBUTION[1], b:GetAttribute("spell1"))
+    end)
+
+    -- The 1.1.0 review's F-05: a third paladin's aura on him is not his own
+    it("moves on from my aura on another paladin who shows only a third paladin's aura", function()
+        local mine = { spellId = D_DEV, expirationTime = 0, source = "player", mine = true }
+        local third = { spellId = D_RET, expirationTime = 0, source = "party2" }
+        local _, D, b = withAuras({ group = "party", units = {
+            party1 = { class = "PALADIN", auras = { mine, third } }, party2 = { class = "PALADIN" } } })
+        STATE.known[D.AURAS.CONCENTRATION[1]] = true
+        FIRE("UNIT_AURA", "party1")
+        refresh()
+        assert.are.equal(D.AURAS.CONCENTRATION[1], b:GetAttribute("spell1"))
+    end)
+
+    it("infers nothing beside his own aura, without my aura on him, or on a non-paladin", function()
+        local mine = { spellId = D_DEV, expirationTime = 0, source = "player", mine = true }
+        local his = { spellId = D_RET, expirationTime = 0, source = "party1" }
+        local _, D, b = withAuras({ group = "party", units = { party1 = { class = "PALADIN", auras = { mine, his } } } })
+        assert.are.equal(D.AURAS.DEVOTION[1], b:GetAttribute("spell1"))
+        _, D, b = withAuras({ group = "party", units = { party1 = { class = "PALADIN" } } })
+        assert.are.equal(D.AURAS.DEVOTION[1], b:GetAttribute("spell1"))
+        _, D, b = withAuras({ group = "party", units = { party1 = { class = "WARRIOR", auras = { mine } } } })
+        assert.are.equal(D.AURAS.DEVOTION[1], b:GetAttribute("spell1"))
+    end)
+
     it("takes the first known aura when every one is taken", function()
         local _, D, b = withAuras(own({ group = "party", units = { party1 = paladin(D_DEV), party2 = paladin(D_RET) } }))
         assert.are.equal(D.AURAS.DEVOTION[1], b:GetAttribute("spell1"))
@@ -143,6 +174,7 @@ describe("the aura button", function()
     it("counts no aura whose spell is a secret", function()
         local _, D, b = withAuras(own({ group = "party", units = { party1 = paladin(D_DEV) } }))
         STATE.secrets = { [D.AURAS.DEVOTION[1]] = true }
+        FIRE("UNIT_AURA", "party1")
         refresh()
         assert.are.equal(D.AURAS.DEVOTION[1], b:GetAttribute("spell1"))
         assert.are.same({}, STATE.errors)
@@ -238,6 +270,7 @@ describe("the Righteous Fury button", function()
         assert.is_true(b.ants:IsShown())
         assert.is_false(b.icon:IsDesaturated())
         STATE.units.player.auras = { { spellId = rf, expirationTime = 1800, mine = true } }
+        FIRE("UNIT_AURA", "player")
         ns.Refresh()
         assert.is_false(b.ants:IsShown())
         assert.is_false(b.icon:IsDesaturated())
@@ -284,6 +317,7 @@ describe("Righteous Fury's renewal", function()
     end
     local function furyLeft(ns, seconds)
         STATE.units.player.auras = { { spellId = ns.D.RIGHTEOUS_FURY, expirationTime = STATE.now + seconds, mine = true } }
+        FIRE("UNIT_AURA", "player")
         ns.Refresh()
         return ns.furyButton.ants:IsShown()
     end
@@ -301,6 +335,7 @@ describe("Righteous Fury's renewal", function()
         SmartBlessingBarDB.furyRenewMinutes = 0
         assert.is_false(furyLeft(ns, 10))
         STATE.units.player.auras = {}
+        FIRE("UNIT_AURA", "player")
         ns.Refresh()
         assert.is_true(ns.furyButton.ants:IsShown())
     end)
@@ -309,6 +344,7 @@ describe("Righteous Fury's renewal", function()
         local ns = tankLogin(nil)
         assert.is_false(furyLeft(ns, 10))
         STATE.units.player.auras = {}
+        FIRE("UNIT_AURA", "player")
         ns.Refresh()
         assert.is_false(ns.furyButton.ants:IsShown())
     end)
@@ -325,5 +361,16 @@ describe("Righteous Fury's renewal", function()
             ns.InitDB()
             assert.are.equal(expected, SmartBlessingBarDB.furyRenewMinutes, tostring(saved))
         end
+    end)
+end)
+
+-- Every left click named, as on the blessing buttons (Michel, from SimpleConjureBar 2026-10-22)
+describe("the self-buff buttons' tooltip", function()
+    it("names whom the left click reaches under the spell", function()
+        local ns = login()
+        ns.auraButton:SetAttribute("spell1", ns.D.AURAS.DEVOTION[1])
+        RUNSCRIPT(ns.auraButton, "OnEnter")
+        local last = GameTooltip.lines[#GameTooltip.lines]
+        assert.are.same({ ns.L.LEFTCLICK, UnitName("player") }, { last[1], last[2] })
     end)
 end)

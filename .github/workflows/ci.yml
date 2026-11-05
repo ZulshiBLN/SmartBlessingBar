@@ -7,17 +7,13 @@ on:
   push:
     branches: [develop, main]
   # The release workflow runs these same checks before it publishes, with its
-  # tag, and passes exactly the two upload tokens the rehearsal needs
+  # tag. No upload token reaches them: the rehearsal runs without one (ruleset
+  # plan 2026-10-24-release-environment).
   workflow_call:
     inputs:
       tag:
         type: string
         default: ""
-    secrets:
-      CF_API_TOKEN:
-        required: true
-      WAGO_API_TOKEN:
-        required: true
 
 permissions:
   contents: read
@@ -27,6 +23,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # nothing here pushes
 
       - uses: leafo/gh-actions-lua@6919171ccf181b826f44b9bca76307b577217377 # v13.0.0
         with:
@@ -36,8 +33,8 @@ jobs:
 
       - name: Install luacheck and busted
         run: |
-          luarocks install luacheck
-          luarocks install busted
+          luarocks install luacheck 1.2.0-1
+          luarocks install busted 2.3.0-1
 
       - name: luacheck
         run: luacheck .
@@ -81,6 +78,3 @@ jobs:
     uses: ./.github/workflows/publish.yml
     with:
       dry_run: true
-    secrets:
-      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-      WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}

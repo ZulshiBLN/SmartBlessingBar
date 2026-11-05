@@ -7,7 +7,7 @@
 # Usage: upload-wago.sh [--dry-run] <zip> <notes.md>
 # The token comes from WAGO_API_TOKEN and is never printed.
 # --dry-run resolves the game version and builds the payload, uploads nothing.
-# Wago's version list is public, so a dry run sees only that a token is set.
+# Wago's version list is public, so a dry run needs no token.
 # For the CI controls only, with --dry-run: WAGO_VERSIONS_FILE replaces the
 # site's version list, GAME_VERSION the version the TOC asks for.
 set -euo pipefail
@@ -29,10 +29,12 @@ project=$(toc_field X-Wago-ID)
 label="v$(toc_field Version)"
 target=${GAME_VERSION:-$(interface_to_version "$(toc_field Interface)")}
 
+# A real upload needs the token, checked before anything goes over the network; the
+# rehearsal runs without it (ruleset plan 2026-10-24-release-environment)
+[ -n "$dry" ] || [ -n "${WAGO_API_TOKEN:-}" ] || fail "WAGO_API_TOKEN is not set"
 if [ -n "${WAGO_VERSIONS_FILE:-}" ]; then
     versions=$(cat "$WAGO_VERSIONS_FILE")
 else
-    [ -n "${WAGO_API_TOKEN:-}" ] || fail "WAGO_API_TOKEN is not set"
     versions=$(curl -sS -f "$api/data/game") || fail "Wago did not return its version list"
 fi
 

@@ -240,6 +240,12 @@ describe("the overview", function()
         assert.are.equal(D.SALVATION, spell)
         assert.are.same({ ns.L.OV_FROM:format(ns.L.OV_ANOTHER) }, lines)
         assert.are.same({}, STATE.errors)
+        -- In an instance the giver's name can be secret: he is "another paladin" (ruleset plan
+        -- 2026-10-25-rank-glow-fixes)
+        STATE.secrets = { Tyr = true }
+        lines = select(2, tip("KINGS"))
+        assert.are.same({ ns.L.OV_FROM:format(ns.L.OV_ANOTHER), ns.L.OV_LEFT:format(10) }, lines)
+        assert.are.same({}, STATE.errors)
     end)
 
     it("shows twenty members without scrolling, the 21st makes it scroll", function()
@@ -258,6 +264,7 @@ describe("the overview", function()
     it("follows the refresh while shown", function()
         local ns, o = login({ group = "party", units = { party1 = { class = "WARRIOR" } } })
         STATE.units.party1.auras = { aura(M.normal[6], { mine = true }) }
+        FIRE("UNIT_AURA", "party1")
         ns.Refresh()
         assert.are.same({ MIGHT = { true, false } }, icons(row(o, "party1")))
     end)
@@ -333,6 +340,7 @@ describe("the overview's aura slot", function()
             auras = { aura(DEV, { source = "party1" }) } } } })
         assert.is_true(row(o, "party1").aura:IsShown())
         STATE.secrets = { [DEV] = true }
+        FIRE("UNIT_AURA", "party1")
         ns.Refresh()
         assert.is_false(row(o, "party1").aura:IsShown())
     end)

@@ -1,0 +1,48 @@
+# One field for the code the game's bug report window gives (/sbb bug), so a player needs to
+# know nothing about GitHub but signing in, pasting and sending (ruleset plan
+# 2026-10-24-bug-report). GitHub reads issue forms from the default branch only.
+name: Bug report
+description: Something in SmartBlessingBar does not work as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This issue is public, under your GitHub name.** Everyone can read what you send here.
+
+        In the game, type `/sbb bug` (or click "Report bug" in the settings), write what
+        happened, choose where it happened, and copy the code with Ctrl+C. "Show content"
+        in the window shows everything the code holds: the addon's version and settings,
+        your client, class and level range, the group's size and classes, your buffs by ID
+        and the reagent count, errors that name this addon, its last actions and state, and
+        your loaded addons. It is filtered for your character, realm and guild, your current
+        group, target and focus, GUIDs, BattleTags, e-mail addresses and absolute file paths -
+        friends, guild members outside the group or a name written together with other
+        letters can remain, so check "Show content". The code is not encrypted: anyone can
+        read it.
+        See [privacy](https://github.com/ZulshiBLN/SmartBlessingBar#privacy-and-security)
+        and [data protection](https://github.com/ZulshiBLN/SmartBlessingBar#data-protection).
+
+        On an older version of the addon, without a code? Update first. If you cannot, open a
+        blank issue and remove the "Date:" line and any names from the old report before you
+        send it.
+  - type: textarea
+    id: code
+    attributes:
+      label: Report code
+      description: Paste the code from the game here. It starts with "SBB1:".
+      render: text
+    validations:
+      required: true
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Public acknowledgement
+      options:
+        - label: I looked at the content ("Show content" in the game) and agree that it is public.
+          required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Optional. Screenshots are public too - crop or blur names, chat, realm, guild and anything personal before you add one.

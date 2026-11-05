@@ -35,6 +35,9 @@ local function raid()
     STATE.bags = { [D.SYMBOL_OF_KINGS] = 20 }
     FIRE("PLAYER_LOGIN")
     ns.OpenSettingsOn("TAB_PRIORITIES")
+    -- the members' snapshots kept since login (ruleset plan 2026-10-24-kept-snapshots) dropped,
+    -- so the refresh reads everyone
+    FIRE("GROUP_ROSTER_UPDATE")
     STATE.scans, STATE.spellChecks = {}, {}
     return ns
 end
@@ -109,12 +112,14 @@ describe("a read broken off by an error", function()
         STATE.known = { [D.BLESSINGS.MIGHT.normal[1]] = true }
         FIRE("PLAYER_LOGIN")
         local B, plan = ns.Blessings, ns.Blessings.PlanBlessings
-        B.PlanBlessings = function() B.Auras("player") error("broken") end
+        -- a stranger as target: no snapshot of his outlives a read
+        STATE.units.target = { class = "MAGE" }
+        B.PlanBlessings = function() B.Auras("target") error("broken") end
         pcall(ns.Refresh)
         B.PlanBlessings = plan
         STATE.scans = {}
-        B.WithRead(function() B.Auras("player") end)
-        assert.are.equal(1, (STATE.scans[STATE.units.player] or {}).HELPFUL)
+        B.WithRead(function() B.Auras("target") end)
+        assert.are.equal(1, (STATE.scans[STATE.units.target] or {}).HELPFUL)
     end)
 end)
 

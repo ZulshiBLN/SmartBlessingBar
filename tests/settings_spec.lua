@@ -32,6 +32,31 @@ describe("settings", function()
         assert.are.same(once, SmartBlessingBarDB)
     end)
 
+    -- The 1.1.0 review's F-03: a lost version ran version 8's conversion again over current lists
+    it("keep a current aura list and class lists when the version is lost or damaged", function()
+        for _, version in ipairs({ "x", false, "none" }) do
+            local saved = { dbVersion = version ~= "none" and version or nil,
+                auraList = { "FIRE", "DEVOTION", "RETRIBUTION", "CONCENTRATION", "SHADOW", "FROST", "SANCTITY" },
+                classLists = { MAGE = { order = { "KINGS", "WISDOM" }, off = { MIGHT = true, LIGHT = true } } } }
+            local ns = addon.load("enUS", { db = saved })
+            ns.InitDB()
+            local db = SmartBlessingBarDB
+            assert.are.equal("FIRE", db.auraList[1], tostring(version))
+            assert.are.same({ "KINGS", "WISDOM" }, db.classLists.MAGE.order, tostring(version))
+            assert.are.same({ MIGHT = true, LIGHT = true }, db.classLists.MAGE.off, tostring(version))
+        end
+    end)
+
+    it("take a version 7 file's role lists over any class lists it holds", function()
+        local ns = addon.load("enUS", { db = { dbVersion = 7,
+            classLists = { MAGE = { order = { "MIGHT" }, off = {} } },
+            roleLists = { CASTER = { order = { "KINGS", "WISDOM" }, off = { MIGHT = true, LIGHT = true } } } } })
+        ns.InitDB()
+        local role = ns.D.CLASS_ROLES.MAGE[1]
+        assert.are.equal("CASTER", role) -- the mage's default role, as this file assumes
+        assert.are.same({ "KINGS", "WISDOM" }, SmartBlessingBarDB.classLists.MAGE.order)
+    end)
+
     it("replace a damaged aura, lock and position", function()
         local ns = addon.load("enUS", { db = {
             dbVersion = 2, assign = "x", aura = "FOO", locked = "yes",
@@ -213,5 +238,31 @@ describe("settings version 4", function()
         local once = copy(db)
         ns.InitDB()
         assert.are.same(once, SmartBlessingBarDB)
+    end)
+end)
+
+-- Settings version 12 (ruleset plan 2026-10-22-anchor-and-window-background, criterion 1)
+describe("settings version 12", function()
+    it("adds Show anchor on and today's window background to a version 11 file", function()
+        local ns = addon.load("enUS", { db = { dbVersion = 11 } })
+        ns.InitDB()
+        assert.are.equal(12, ns.D.DB_VERSION)
+        assert.are.equal(ns.D.DB_VERSION, SmartBlessingBarDB.dbVersion)
+        assert.is_true(SmartBlessingBarDB.showAnchor)
+        assert.are.equal(ns.D.WINDOW_OPACITY_TODAY, SmartBlessingBarDB.windowOpacity)
+    end)
+
+    it("keeps saved choices and repairs damaged ones", function()
+        local today = addon.load("enUS").D.WINDOW_OPACITY_TODAY
+        for saved, expected in pairs({ [30] = 30, [150] = 100, [-5] = 0, x = today }) do
+            local ns = addon.load("enUS", { db = { dbVersion = 12, showAnchor = false,
+                windowOpacity = saved == "x" and "x" or saved } })
+            ns.InitDB()
+            assert.is_false(SmartBlessingBarDB.showAnchor)
+            assert.are.equal(expected, SmartBlessingBarDB.windowOpacity, tostring(saved))
+        end
+        local ns = addon.load("enUS", { db = { dbVersion = 12, showAnchor = "yes" } })
+        ns.InitDB()
+        assert.is_true(SmartBlessingBarDB.showAnchor)
     end)
 end)

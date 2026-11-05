@@ -41,12 +41,16 @@ controls.hideCombat, controls.hideMinimap = UI.AddCheckRow({
 })
 UI.AddSeparator()
 
--- Scale: slider in 0.1 steps or number input (0.05 steps)
+-- Scale: slider in 0.1 steps or number input (0.05 steps). It is the left column of its row;
+-- the window background takes the right one (ruleset plan 2026-10-22-anchor-and-window-
+-- background), so the row is laid out as UI.AddNumberSlider's columns are.
 do
-    local ROW = 40
+    local ROW = 42
     local row = CreateFrame("Frame", nil, general)
     row:SetHeight(ROW)
-    row:SetPoint("TOPLEFT", INSET, Place(ROW, 6))
+    local y = Place(ROW, 6)
+    UI.CurrentPage().columnY = y
+    row:SetPoint("TOPLEFT", INSET, y)
 
     local label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     label:SetPoint("TOPLEFT", 0, -4)
@@ -61,7 +65,7 @@ do
     controls.scaleBox = box
 
     local slider = UI.MakeSlider(row)
-    slider:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 2, -10)
+    slider:SetPoint("TOPLEFT", row, "TOPLEFT", 2, -28) -- level with the right column's slider
     slider:SetMinMaxValues(D.SCALE_MIN, D.SCALE_MAX)
     slider:SetValueStep(0.05) -- fine step, so typed 0.05 values stay where they are
     controls.scaleSlider = slider
@@ -109,14 +113,27 @@ do
         updating = false
         box:SetText(Format(db.scale))
     end
-    measures[#measures + 1] = function() return label:GetStringWidth() + 16 + 44 end
+    measures[#measures + 1] = function() return 2 * (label:GetStringWidth() + 16 + 44) + UI.COLUMN_GAP end
     stretchers[#stretchers + 1] = function(w)
-        row:SetWidth(w)
-        slider:SetWidth(w - 4)
+        local rowW = (w - UI.COLUMN_GAP) / 2
+        row:SetWidth(rowW)
+        slider:SetWidth(rowW - 4)
     end
 end
 
-controls.border = UI.AddCheck("OPT_BORDER", "showBorder", function() ns.ApplyLook() end)
+-- The settings and report windows' background, 0 % invisible to 100 % solid
+controls.windowOpacity, controls.windowOpacityBox = UI.AddNumberSlider({
+    label = "OPT_WINDOW_OPACITY", key = "windowOpacity", column = "right",
+    onChange = function()
+        ns.ApplyWindowOpacity(UI.window)
+        ns.ApplyWindowOpacity(ns.reportWindow)
+    end,
+})
+
+controls.border, controls.showAnchor = UI.AddCheckRow({
+    { label = "OPT_BORDER",      key = "showBorder", onChange = function() ns.ApplyLook() end },
+    { label = "OPT_SHOW_ANCHOR", key = "showAnchor", onChange = function() ns.ApplyAnchor() end },
+})
 controls.bg = UI.AddSwatch("OPT_BG", "bg", 8)
 UI.AddSeparator()
 
@@ -204,16 +221,41 @@ controls.showBlessing, controls.blessingColors = UI.AddToggleColorRow("OPT_SHOW_
     { label = "LBL_TEXT",      key = "countColor" },
 })
 controls.blessingSpeed = UI.AddSpeedSlider("blessingAntsSpeed")
-UI.AddSeparator()
+controls.salvationLine = UI.AddSeparator()
 
 -- The Salvation button; Salvation is a spell, so the client names it (localization.md)
-controls.salvationHeader = UI.AddHeader(function()
+local function SalvationTitle()
     return ns.LocalName(C_Spell.GetSpellName(D.SALVATION), "SALVATION")
-end, 6)
+end
+controls.salvationHeader = UI.AddHeader(SalvationTitle, 6)
 controls.showSalvation, controls.salvationColors = UI.AddToggleColorRow("OPT_SHOW_BUTTON", "showSalvation", Refresh, {
     { label = "LBL_HIGHLIGHT", key = "salvationAntsColor" },
 })
 controls.salvationSpeed = UI.AddSpeedSlider("salvationAntsSpeed")
+-- All of it away while the client has no Salvation, back at the next opening once it has
+-- (ruleset plan 2026-11-05-removed-spells)
+refreshers[#refreshers + 1] = function()
+    local exists = ns.Blessings.Exists(D.SALVATION)
+    ns.SetL(controls.salvationHeader, SalvationTitle)
+    for _, part in ipairs({ controls.salvationHeader, controls.showSalvation:GetParent(),
+                            controls.salvationSpeed:GetParent(), unpack(controls.salvationLine) }) do
+        part:SetShown(exists)
+    end
+end
+
+-- Moves an entry among those of a saved list that `isShown`, from shown slot to shown slot;
+-- the hidden ones keep their index, so a spell that returns takes its old place
+local function MoveShown(list, isShown, from, to)
+    local slots, entries = {}, {}
+    for i, entry in ipairs(list) do
+        if isShown(entry) then
+            slots[#slots + 1] = i
+            entries[#entries + 1] = entry
+        end
+    end
+    table.insert(entries, to, table.remove(entries, from))
+    for s, i in ipairs(slots) do list[i] = entries[s] end
+end
 
 ---------------------------------------------------------------------------
 -- Supplies: the Symbol of Kings count and the auto-buy
@@ -266,13 +308,18 @@ do
     -- 2026-10-20-fury-renew); spell names from the client (localization.md)
     controls.renewTitle = UI.AddNote("RENEW_LABEL", 6)
     local function SpellName(id, key) return ns.LocalName(C_Spell.GetSpellName(id), key) end
+    local function RenewLabel()
+        if not B.Exists(D.SALVATION) then return L.BTN_BLESSINGS end
+        return L.RENEW_BLESSINGS:format(SpellName(D.SALVATION, "SALVATION"))
+    end
     local _
     controls.renewMinutes, _, controls.renewRow = UI.AddNumberSlider({
-        label = function() return L.RENEW_BLESSINGS:format(SpellName(D.SALVATION, "SALVATION")) end,
+        label = RenewLabel,
         key = "renewMinutes", gap = 4, column = "left", onChange = function() ns.Refresh() end })
     controls.furyRenewMinutes, _, controls.furyRenewRow = UI.AddNumberSlider({
         label = function() return SpellName(D.RIGHTEOUS_FURY, "RIGHTEOUS_FURY") end,
         key = "furyRenewMinutes", column = "right", onChange = function() ns.Refresh() end })
+    refreshers[#refreshers + 1] = function() ns.SetL(controls.renewRow.label, RenewLabel) end
     UI.AddSeparator()
 
     local ICON, ICON_GAP, LABEL_W, ROW_GAP = 24, 6, 90, 6
@@ -283,11 +330,20 @@ do
     local RefreshLists
     local drag -- { row, index } while dragging
 
+    -- The icons on a row: its entries that exist (the client may have removed a family), on
+    local function OnEntries(row)
+        local out = {}
+        for _, family in ipairs(row.list().order) do
+            if row.exists(family) then out[#out + 1] = family end
+        end
+        return out
+    end
+
     -- The families a row shows: those on, in order, then those off in D.BLESSING_ORDER
-    local function Shown(list)
-        local out = { unpack(list.order) }
+    local function Shown(row)
+        local out, list = OnEntries(row), row.list()
         for _, family in ipairs(D.BLESSING_ORDER) do
-            if list.off[family] then out[#out + 1] = family end
+            if list.off[family] and row.exists(family) then out[#out + 1] = family end
         end
         return out
     end
@@ -298,7 +354,7 @@ do
         if not left then return end
         local cx = GetCursorPosition() / row.icons[1]:GetEffectiveScale()
         local slot = math.floor((cx - left) / (ICON + ICON_GAP)) + 1
-        return math.max(1, math.min(#row.list().order, slot))
+        return math.max(1, math.min(#OnEntries(row), slot))
     end
 
     local function StopListDrag()
@@ -315,8 +371,7 @@ do
         local row = rows[drag.row]
         local slot = SlotUnderCursor(row)
         if slot and slot ~= drag.index then
-            local order = row.list().order
-            table.insert(order, slot, table.remove(order, drag.index))
+            MoveShown(row.list().order, row.exists, drag.index, slot)
             drag.index = slot
             RefreshLists()
         end
@@ -330,7 +385,7 @@ do
         if list.off[family] then
             list.off[family] = nil
             table.insert(list.order, family)
-        elseif #list.order > 1 then
+        elseif #OnEntries(row) > 1 then
             for i, f in ipairs(list.order) do
                 if f == family then table.remove(list.order, i) break end
             end
@@ -342,10 +397,11 @@ do
 
     -- A row: `list()` gives { order, off }, `spells(family)` the family's spell IDs by rank.
     -- The caller places it.
-    local function NewRow(r, count, label, list, spells, switchable)
+    local function NewRow(r, count, label, list, spells, switchable, exists)
         local row = CreateFrame("Frame", nil, prioritiesPage)
         row:SetHeight(ICON)
         row.list, row.spells, row.switchable, row.labelText = list, spells, switchable, label
+        row.exists = exists
         -- A row without a label (the aura row) starts its icons at its left edge
         if label then
             row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -367,7 +423,7 @@ do
             icon.tex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
             icon:SetScript("OnMouseDown", function(_, btn)
                 -- Only an icon that is on moves; those off keep their place at the end
-                if btn ~= "LeftButton" or i > #row.list().order then return end
+                if btn ~= "LeftButton" or i > #OnEntries(row) then return end
                 drag = { row = r, index = i }
                 RefreshLists()
                 prioritiesPage:SetScript("OnUpdate", OnDragUpdate)
@@ -406,7 +462,7 @@ do
     controls.auraTitle = Title("AURA_LIST")
     local auraRow = NewRow(#D.CLASS_ORDER + 1, #D.AURA_ORDER, nil,
         function() return { order = db.auraList, off = {} } end,
-        function(family) return D.AURAS[family] end, false)
+        function(family) return D.AURAS[family] end, false, function() return true end)
     auraRow:SetWidth(#D.AURA_ORDER * (ICON + ICON_GAP) - ICON_GAP)
     auraRow:SetPoint("TOP", prioritiesPage, "TOP", 0, Place(ICON, 6))
     controls.auraRow = auraRow
@@ -420,7 +476,7 @@ do
         -- As many icons as the class has blessings (ruleset plan 2026-10-20-class-defaults)
         local row = NewRow(r, #D.CLASS_LISTS[class], function()
             return ns.LocalName(LOCALIZED_CLASS_NAMES_MALE[class], "CLASS_" .. class)
-        end, function() return db.classLists[class] end, BlessingSpells, true)
+        end, function() return db.classLists[class] end, BlessingSpells, true, B.FamilyExists)
         row.label:SetTextColor(C_ClassColor.GetClassColor(class):GetRGB()) -- Michel
         row.class = class
         row.column = r <= LEFT_ROWS and 1 or 2
@@ -456,7 +512,7 @@ do
         for _, class in ipairs(D.CLASS_ORDER) do
             local list = db.classLists[class]
             for _, family in ipairs(D.BLESSING_ORDER) do
-                if list.off[family] then
+                if list.off[family] and B.FamilyExists(family) then
                     list.off[family] = nil
                     table.insert(list.order, family)
                 end
@@ -486,8 +542,14 @@ do
         for r, row in ipairs(rows) do
             local list = row.list()
             if row.label then row.label:SetText(row.labelText()) end
-            for i, family in ipairs(Shown(list)) do
+            local shown = Shown(row)
+            for i = #shown + 1, #row.icons do
+                row.icons[i].family = nil
+                row.icons[i]:Hide()
+            end
+            for i, family in ipairs(shown) do
                 local icon = row.icons[i]
+                icon:Show()
                 icon.family = family
                 icon.tex:SetTexture(C_Spell.GetSpellTexture(row.spells(family)[1]))
                 icon.tex:SetDesaturated(list.off[family] == true)
@@ -538,6 +600,15 @@ do
     local RefreshOrder
     local drag -- { key, index } while dragging
 
+    -- The keys of the rows: the saved order without a button whose spell the client has not
+    local function RowKeys()
+        local out = {}
+        for _, key in ipairs(db.order) do
+            if ns.ButtonExists(key) then out[#out + 1] = key end
+        end
+        return out
+    end
+
     -- Row under the mouse cursor (1..n), no matter where exactly the row is grabbed
     local function SlotUnderCursor()
         local top = rows[1]:GetTop()
@@ -545,7 +616,7 @@ do
         local _, cy = GetCursorPosition()
         cy = cy / rows[1]:GetEffectiveScale()
         local slot = math.floor((top - cy) / (ROW + ROW_GAP)) + 1
-        return math.max(1, math.min(#rows, slot))
+        return math.max(1, math.min(#RowKeys(), slot))
     end
 
     local function StopOrderDrag()
@@ -562,15 +633,14 @@ do
         local slot = SlotUnderCursor()
         if slot and slot ~= drag.index then
             -- The row moves live under the cursor
-            table.remove(db.order, drag.index)
-            table.insert(db.order, slot, drag.key)
+            MoveShown(db.order, ns.ButtonExists, drag.index, slot)
             drag.index = slot
             RefreshOrder()
         end
     end
 
     local function StartOrderDrag(index)
-        drag = { key = db.order[index], index = index }
+        drag = { index = index }
         RefreshOrder()
         orderPage:SetScript("OnUpdate", OnDragUpdate)
     end
@@ -636,10 +706,14 @@ do
     end
 
     RefreshOrder = function()
+        local keys = RowKeys()
         for i, row in ipairs(rows) do
-            local info = ORDER_INFO[db.order[i]]
-            row.label:SetText(info.name())
-            row.icon:SetTexture(info.icon())
+            local info = ORDER_INFO[keys[i]]
+            row:SetShown(info ~= nil)
+            if info then
+                row.label:SetText(info.name())
+                row.icon:SetTexture(info.icon())
+            end
             if drag and drag.index == i then
                 row.bg:SetColorTexture(1, 0.82, 0, 0.18)
                 row.SetGripColor(1, 0.82, 0)

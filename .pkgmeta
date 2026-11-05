@@ -9,3 +9,5 @@ move-folders:
 
 ignore:
   - tests
+  # the bug report decoder runs on a developer's machine, not in the game
+  - tools

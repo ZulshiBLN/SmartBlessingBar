@@ -15,26 +15,30 @@ ns.OnDBReady(function(d) db = d end)
 -- The icon the TOC gives the addon list, read from there: one fact, one place
 local ICON = C_AddOns.GetAddOnMetadata(ADDON_NAME, "IconTexture")
 
-local function ToggleLockWithMessage()
-    ns.ToggleLock()
-    ns.Print(db.locked and L.LOCKED or L.UNLOCKED)
-end
-
 local function ShowEntryTooltip(owner, anchor)
     GameTooltip:SetOwner(owner, anchor)
     GameTooltip:SetText("SmartBlessingBar |cffffffffv" .. ns.VERSION .. "|r")
     GameTooltip:AddLine(" ")
+    -- Left, middle, right, as in every tooltip; only the minimap button opens the Priorities tab
+    -- and can be dragged
+    local minimap = anchor == "ANCHOR_LEFT"
     GameTooltip:AddDoubleLine(L.LEFTCLICK, L.SETTINGS, 0, 1, 0, 1, 1, 1)
-    GameTooltip:AddDoubleLine(L.RIGHTCLICK, db.locked and L.UNLOCK or L.LOCK, 0, 1, 0, 1, 1, 1)
-    if anchor == "ANCHOR_LEFT" then -- only the minimap button opens the Priorities tab and can be dragged
-        GameTooltip:AddDoubleLine(L.MIDDLECLICK, L.TAB_PRIORITIES, 0, 1, 0, 1, 1, 1)
-        GameTooltip:AddDoubleLine(L.DRAG, L.MOVE, 0, 1, 0, 1, 1, 1)
-    end
+    if minimap then GameTooltip:AddDoubleLine(L.MIDDLECLICK, L.TAB_PRIORITIES, 0, 1, 0, 1, 1, 1) end
+    -- Away from the bar "Lock" alone says nothing: it names what it locks
+    GameTooltip:AddDoubleLine(L.RIGHTCLICK, db.locked and L.UNLOCK_BAR or L.LOCK_BAR, 0, 1, 0, 1, 1, 1)
+    if minimap then GameTooltip:AddDoubleLine(L.DRAG, L.MOVE, 0, 1, 0, 1, 1, 1) end
     GameTooltip:Show()
 end
 
-local function Click(button)
-    if button == "RightButton" then ToggleLockWithMessage() else ns.ToggleSettings() end
+-- owner, anchor: the tooltip the click came from, shown again so it says the new state at once
+local function ToggleLockWithMessage(owner, anchor)
+    ns.ToggleLock()
+    ns.Print(db.locked and L.LOCKED or L.UNLOCKED)
+    if owner and GameTooltip:IsOwned(owner) then ShowEntryTooltip(owner, anchor) end
+end
+
+local function Click(button, owner, anchor)
+    if button == "RightButton" then ToggleLockWithMessage(owner, anchor) else ns.ToggleSettings() end
 end
 
 ---------------------------------------------------------------------------
@@ -121,8 +125,8 @@ end
 local prioritiesKey = CreateFrame("Button", "SmartBlessingBarPrioritiesKey", UIParent)
 prioritiesKey:RegisterForClicks("AnyUp")
 prioritiesKey:SetScript("OnClick", PrioritiesClick)
-minimapBtn:SetScript("OnClick", function(_, button)
-    if button == "MiddleButton" then PrioritiesClick() else Click(button) end
+minimapBtn:SetScript("OnClick", function(self, button)
+    if button == "MiddleButton" then PrioritiesClick() else Click(button, self, "ANCHOR_LEFT") end
 end)
 minimapBtn:SetScript("OnEnter", function(self) ShowEntryTooltip(self, "ANCHOR_LEFT") end)
 minimapBtn:SetScript("OnLeave", ns.HideTooltip)
@@ -130,7 +134,7 @@ minimapBtn:SetScript("OnLeave", ns.HideTooltip)
 ---------------------------------------------------------------------------
 -- AddOn compartment: Core.lua's globals call these
 ---------------------------------------------------------------------------
-function ns.CompartmentClick(_, button) Click(button) end
+function ns.CompartmentClick(_, button, menuButton) Click(button, menuButton, "ANCHOR_RIGHT") end
 function ns.CompartmentEnter(_, menuButton) ShowEntryTooltip(menuButton, "ANCHOR_RIGHT") end
 function ns.CompartmentLeave() ns.HideTooltip() end
 

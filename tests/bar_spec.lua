@@ -35,8 +35,9 @@ describe("the handle", function()
         assert.are.equal(ns.handle, GameTooltip.owner)
         assert.are.equal("ANCHOR_LEFT", GameTooltip.anchor)
         assert.are.equal("SmartBlessingBar", GameTooltip:GetText())
-        assert.are.same({ L.TIP_UNLOCKED, " ", L.LEFTCLICK .. "|" .. L.MOVE, L.RIGHTCLICK .. "|" .. L.LOCK,
-                          L.MIDDLECLICK .. "|" .. L.SETTINGS }, lines())
+        -- Left, middle, right, as in every tooltip (Michel, from SimpleConjureBar 2026-10-22)
+        assert.are.same({ L.TIP_UNLOCKED, " ", L.LEFTCLICK .. "|" .. L.MOVE, L.MIDDLECLICK .. "|" .. L.SETTINGS,
+                          L.RIGHTCLICK .. "|" .. L.LOCK }, lines())
         assert.are.same({ 0.4, 0.8, 1 }, { unpack(GameTooltip.lines[1], 3, 5) })
         RUNSCRIPT(ns.handle, "OnLeave")
         assert.is_false(GameTooltip:IsShown())
@@ -50,7 +51,7 @@ describe("the handle", function()
         assert.is_true(SmartBlessingBarDB.locked)
         assert.are.equal(L.TIP_LOCKED, GameTooltip.lines[1][1])
         assert.are.same({ 1, 0.3, 0.3 }, { unpack(GameTooltip.lines[1], 3, 5) })
-        assert.are.equal(L.RIGHTCLICK .. "|" .. L.UNLOCK, lines()[4])
+        assert.are.equal(L.RIGHTCLICK .. "|" .. L.UNLOCK, lines()[5])
     end)
 
     it("opens and closes the settings on a middle click, locked too", function()
@@ -90,6 +91,7 @@ describe("the blessing button", function()
     it("changes only after combat when the group changes in it", function()
         local _, D, b = login({ known = known(19740, 20217), group = "party", units = { party1 = { class = "MAGE" } } })
         STATE.units.player.auras = { { spellId = D.BLESSINGS.MIGHT.normal[1], expirationTime = 3600, mine = true } }
+        FIRE("UNIT_AURA", "player")
         TICK()
         assert.are.equal("party1", b:GetAttribute("unit1"))
         STATE.combat = true
@@ -117,7 +119,9 @@ describe("the refresh", function()
         RUNTIMERS()
         assert.are.equal("", b.count:GetText())
 
+        -- a lost buff the client did not report: the ticker sees it once the snapshot is 10 s old
         STATE.units.player.auras = {}
+        STATE.now = (STATE.now or 0) + 11
         TICK()
         assert.are.equal("1", b.count:GetText())
 
@@ -177,12 +181,12 @@ describe("the refresh", function()
             RUNTIMERS()
             assert.are.equal("2", b.count:GetText(), unit)
         end
-        FIRE("UNIT_AURA", "party1")
+        FIRE("UNIT_AURA", "player")
         RUNTIMERS()
         assert.are.equal("1", b.count:GetText())
         STATE.units.party1.auras = myMight(D)
         STATE.units.party1.auras[1].mine = true
-        FIRE("UNIT_AURA", "raid1")
+        FIRE("UNIT_AURA", "party1")
         RUNTIMERS()
         assert.are.equal("", b.count:GetText())
     end)
@@ -242,5 +246,71 @@ describe("the bar's buttons", function()
         -- the aura flyout went with ruleset plan 2026-10-19-priorities
         assert.is_nil(ns.flyouts)
         assert.is_nil(ns.header)
+    end)
+end)
+
+-- Show anchor (ruleset plan 2026-10-22-anchor-and-window-background, criterion 2)
+describe("Show anchor", function()
+    it("keeps the handle visible while on, at login, after the mouse leaves and after a drag", function()
+        local ns = login()
+        local h = ns.handle
+        assert.is_true(SmartBlessingBarDB.showAnchor)
+        assert.are.equal(1, h:GetAlpha())
+        RUNSCRIPT(h, "OnEnter")
+        RUNSCRIPT(h, "OnLeave")
+        assert.are.equal(1, h:GetAlpha())
+        RUNSCRIPT(h, "OnMouseDown", "LeftButton")
+        RUNSCRIPT(h, "OnMouseUp", "LeftButton")
+        assert.are.equal(1, h:GetAlpha())
+    end)
+
+    it("hides the handle at once when switched off, also in combat, and on the mouse leaving", function()
+        local ns = login()
+        local h = ns.handle
+        SlashCmdList.SMARTBLESSINGBAR("")
+        local cb = ns.UI.controls.showAnchor
+        STATE.combat = true
+        cb:SetChecked(false)
+        RUNSCRIPT(cb, "OnClick")
+        assert.is_false(SmartBlessingBarDB.showAnchor)
+        assert.are.equal(0, h:GetAlpha())
+        STATE.combat = false
+        RUNSCRIPT(h, "OnEnter")
+        assert.are.equal(1, h:GetAlpha())
+        RUNSCRIPT(h, "OnLeave")
+        assert.are.equal(0, h:GetAlpha())
+        cb:SetChecked(true)
+        RUNSCRIPT(cb, "OnClick")
+        assert.are.equal(1, h:GetAlpha())
+    end)
+end)
+
+-- Ruleset plan 2026-10-22-combat-login-position (SimpleConjureBar's F-01): after a login in
+-- combat, a refresh that ran before the bar was positioned saved the start position over the
+-- player's
+describe("the bar after a login in combat", function()
+    it("keeps the saved position when a refresh runs before the end of combat is seen", function()
+        local ns = addon.load("enUS", { db = { point = "LEFT", rel = "BOTTOMLEFT", x = 300, y = 400 } })
+        STATE.combat = true
+        FIRE("PLAYER_LOGIN")
+        FIRE("UNIT_AURA", "player")
+        STATE.combat = false
+        RUNTIMERS()
+        assert.are.same({ "LEFT", "BOTTOMLEFT", 300, 400 },
+            { SmartBlessingBarDB.point, SmartBlessingBarDB.rel, SmartBlessingBarDB.x, SmartBlessingBarDB.y })
+        FIRE("PLAYER_REGEN_ENABLED")
+        assert.are.same({ "LEFT", "BOTTOMLEFT", 300, 400 },
+            { SmartBlessingBarDB.point, SmartBlessingBarDB.rel, SmartBlessingBarDB.x, SmartBlessingBarDB.y })
+        assert.is_false(ns.barPending)
+    end)
+end)
+
+describe("Show anchor's check box", function()
+    it("shares the row with Show border, to its right, as in SimpleConjureBar", function()
+        local ns = login()
+        SlashCmdList.SMARTBLESSINGBAR("") -- the row lays out its boxes when the window opens
+        local c = ns.UI.controls
+        assert.are.equal(c.border:GetParent(), c.showAnchor:GetParent())
+        assert.is_true(select(4, c.showAnchor:GetPoint(1)) > select(4, c.border:GetPoint(1)))
     end)
 end)

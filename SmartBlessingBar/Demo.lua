@@ -185,14 +185,22 @@ local function Carried(m, now)
     local function Give(family, spell, by, mine)
         carried[family] = { spell = spell, by = by, mine = mine, expires = now + m.left[family] * 60 }
     end
-    local first = db.classLists[m.class].order[1]
-    Give(first, RankFor(first, n), me.name, true)
+    -- A family the client has not is passed (ruleset plan 2026-11-05-removed-spells)
+    local function FirstFree()
+        for _, family in ipairs(db.classLists[m.class].order) do
+            if B.FamilyExists(family) and not carried[family] then return family end
+        end
+    end
+    local first = FirstFree()
+    if first then Give(first, RankFor(first, n), me.name, true) end
     for i = 2, #raid.paladins do
         local family = raid.paladins[i].gives
         if family == "MIGHT" and WISDOM_CLASSES[m.class] then family = "WISDOM" end
-        if family ~= first then Give(family, RankFor(family, n), raid.paladins[i].name) end
+        -- Without Light the fourth gives what the class's list holds and nobody gave, if any
+        if family == "LIGHT" and not B.FamilyExists("LIGHT") then family = FirstFree() end
+        if family and family ~= first then Give(family, RankFor(family, n), raid.paladins[i].name) end
     end
-    if m.role ~= "TANK" and not m.lacking then
+    if m.role ~= "TANK" and not m.lacking and B.Exists(D.SALVATION) then
         local mass = n - tanks >= D.RAID_GREATER_MIN + tanks
         Give("SALVATION", mass and D.MASS_SALVATION or D.SALVATION, me.name, true)
     end
@@ -207,7 +215,7 @@ function ns.DemoRaid()
         local d = { name = m.name, class = m.class, role = m.role, greyed = m.greyed, edge = m.edge,
                     carried = Carried(m, now) }
         if m.aura then d.aura = { spell = Last(D.AURAS[m.aura]), by = m.name, expires = 0 } end
-        if m.lacking then d.next = { family = "SALVATION", spell = D.SALVATION } end
+        if m.lacking and B.Exists(D.SALVATION) then d.next = { family = "SALVATION", spell = D.SALVATION } end
         list[#list + 1] = d
     end
     return list

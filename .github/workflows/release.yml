@@ -19,6 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false # nothing here pushes
           fetch-depth: 0
       - name: Refuse a tag that is not a release merge in main
         run: bash .github/scripts/check-release-ref.sh "$GITHUB_SHA"
@@ -29,9 +30,6 @@ jobs:
     uses: ./.github/workflows/ci.yml
     with:
       tag: ${{ github.ref_name }}
-    secrets: # exactly the two the rehearsal needs, not secrets: inherit
-      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-      WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
 
   # From here on the release is public, channel by channel
   publish:
@@ -41,6 +39,8 @@ jobs:
       contents: write # gh release create
     with:
       dry_run: false
+    # By name, not secrets: inherit. They live in the environment "release": GitHub
+    # resolves them for publish.yml's jobs in that environment only when passed here
     secrets:
       CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
       WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}

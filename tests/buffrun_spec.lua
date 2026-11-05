@@ -103,6 +103,17 @@ describe("Buff & Run's middle click", function()
         assert.are.equal(1, STATE.targetedNext)
     end)
 
+    it("takes a spell the client answers no cooldown for, as an unlearned rank in demo mode", function()
+        local _, b = login({ class = "MAGE" }, { { class = "ROGUE" } })
+        local get = C_Spell.GetSpellCooldown
+        C_Spell.GetSpellCooldown = function() return nil end
+        local ok, err = pcall(press, b)
+        C_Spell.GetSpellCooldown = get
+        assert.is_true(ok, err)
+        assert.are.same({}, STATE.errors)
+        assert.are.equal(1, #STATE.casts)
+    end)
+
     it("only moves on in combat, also after a cooldown press just before it", function()
         local _, b = login({ class = "MAGE" }, { { class = "ROGUE" }, { class = "PRIEST" } })
         STATE.gcd = true
@@ -223,18 +234,31 @@ end)
 -- Allow PvP blessing (ruleset plan 2026-10-20-performance-pvp, item 4): blessing a PvP-flagged
 -- player flags the paladin too. Buff & Run only; the group buttons are unchanged.
 describe("Buff & Run and PvP-flagged players", function()
-    it("passes a flagged target unless allowed, also when the player is flagged", function()
+    it("passes a flagged target unless allowed, also when the player's flag only runs out", function()
         local _, b = login({ class = "MAGE", pvp = true }, { { class = "ROGUE" } })
         assert.is_false(SmartBlessingBarDB.pvpBlessing)
         press(b)
         assert.are.same({}, STATE.casts)
         assert.are.equal(1, STATE.targetedNext)
+        -- Flagged by the 5-minute timer, as after blessing a flagged player by accident
         STATE.units.player.pvp = true
+        STATE.pvpTimer = true
         STATE.units.target = { class = "MAGE", pvp = true }
         press(b)
         assert.are.same({}, STATE.casts)
+        STATE.pvpTimer = false
         SmartBlessingBarDB.pvpBlessing = true
         STATE.units.target = { class = "MAGE", pvp = true }
+        press(b)
+        assert.are.same({ { spell = W.normal[5], unit = "target" } }, STATE.casts)
+    end)
+
+    -- Michel's rule of 2026-10-22, from SimpleConjureBar: flagged for good - /pvp, the portrait
+    -- menu, a battleground, an arena or a PvP zone - the paladin loses nothing by blessing
+    it("blesses a flagged target while the player is flagged for good, the box off", function()
+        local _, b = login({ class = "MAGE", pvp = true }, { { class = "ROGUE" } })
+        STATE.units.player.pvp = true
+        STATE.pvpTimer = false
         press(b)
         assert.are.same({ { spell = W.normal[5], unit = "target" } }, STATE.casts)
     end)

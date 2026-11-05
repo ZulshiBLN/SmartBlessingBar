@@ -78,12 +78,13 @@ function ns.SetText(fs, text)
     end
 end
 
--- The spell a main button casts, as the game's own tooltip
+-- The spell a main button casts, as the game's own tooltip, and whom the left click reaches
 function ns.ShowSpellTooltip(self)
     local spell = self:GetAttribute("spell1")
     if not spell then return end
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     GameTooltip:SetSpellByID(spell)
+    GameTooltip:AddDoubleLine(L.LEFTCLICK, (UnitName("player")), 1, 1, 1)
     GameTooltip:Show()
 end
 
@@ -123,6 +124,8 @@ end
 
 -- Shows or hides a button's highlight and starts or stops its animation
 function ns.SetAnts(b, shown)
+    -- A button cast in combat stays dark until the planners read the group again
+    if b.cast then shown = false end
     if shown == b.antsShown then return end
     b.antsShown = shown
     if shown then
@@ -145,7 +148,8 @@ bar:SetClampedToScreen(true)
 bar:SetPoint("CENTER", UIParent, "CENTER", 0, -150) -- start position, replaced at login
 ns.ApplyBackdrop(bar)
 
--- Drag handle; only visible while the mouse is over it, or while dragging
+-- Drag handle; visible while Show anchor is on, else only while the mouse is over it or while
+-- dragging (ruleset plan 2026-10-22-anchor-and-window-background)
 local handle = CreateFrame("Frame", nil, bar)
 ns.handle = handle
 handle:SetSize(10, SIZE)
@@ -165,16 +169,20 @@ local function ShowHandleTooltip(self)
     end
     GameTooltip:AddLine(" ")
     GameTooltip:AddDoubleLine(L.LEFTCLICK, L.MOVE, 0, 1, 0, 1, 1, 1)
-    GameTooltip:AddDoubleLine(L.RIGHTCLICK, db.locked and L.UNLOCK or L.LOCK, 0, 1, 0, 1, 1, 1)
     GameTooltip:AddDoubleLine(L.MIDDLECLICK, L.SETTINGS, 0, 1, 0, 1, 1, 1)
+    GameTooltip:AddDoubleLine(L.RIGHTCLICK, db.locked and L.UNLOCK or L.LOCK, 0, 1, 0, 1, 1, 1)
     GameTooltip:Show()
+end
+-- The handle's alpha is not protected: applied at once, in combat too
+function ns.ApplyAnchor()
+    handle:SetAlpha((db.showAnchor or handle.moving or handle:IsMouseOver()) and 1 or 0)
 end
 handle:SetScript("OnEnter", function(self)
     self:SetAlpha(1)
     ShowHandleTooltip(self)
 end)
 handle:SetScript("OnLeave", function(self)
-    if not self.moving then self:SetAlpha(0) end
+    if not self.moving then self:SetAlpha(db.showAnchor and 1 or 0) end
     GameTooltip:Hide()
 end)
 
@@ -290,7 +298,7 @@ local function StopDrag()
     if InCombatLockdown() then return end
     bar:StopMovingOrSizing()
     ns.ReAnchor()
-    if not handle:IsMouseOver() then handle:SetAlpha(0) end
+    ns.ApplyAnchor()
 end
 handle:SetScript("OnMouseUp", StopDrag)
 
@@ -365,14 +373,25 @@ local BUTTONS = {
     AURA = { function() return ns.auraButton end, "showAura" },
     FURY = { function() return ns.furyButton end, "showFury" },
     BLESSING = { function() return ns.blessingButton end, "showBlessing" },
-    SALVATION = { function() return ns.salvationButton end, "showSalvation" },
+    SALVATION = { function() return ns.salvationButton end, "showSalvation", function() return D.SALVATION end },
 }
 ns.BAR_BUTTONS = BUTTONS
+
+-- Whether a button's spell is in the client, where it names one, and whether the button is on the
+-- bar: that, and its setting on (ruleset plan 2026-11-05-removed-spells)
+function ns.ButtonExists(key)
+    local spell = BUTTONS[key][3]
+    return not spell or ns.Blessings.Exists(spell())
+end
+
+function ns.ButtonShown(key)
+    return db[BUTTONS[key][2]] and ns.ButtonExists(key)
+end
 
 -- What the layout depends on; layoutKey (above ns.LoadPosition) is the last one laid out
 local function LayoutKey()
     local parts = { tostring(db.vertical), tostring(db.growRev), tostring(db.scale) }
-    for _, k in ipairs(db.order) do parts[#parts + 1] = k .. "=" .. tostring(db[BUTTONS[k][2]]) end
+    for _, k in ipairs(db.order) do parts[#parts + 1] = k .. "=" .. tostring(ns.ButtonShown(k)) end
     return table.concat(parts, ",")
 end
 
@@ -381,7 +400,10 @@ end
 -- auras secret out of combat it lays out and writes the settings, and the planners wait.
 -- PLAYER_REGEN_ENABLED runs it again, which also applies anything ns.SetAttr skipped.
 function ns.Refresh(combatStart)
-    if not db or InCombatLockdown() then return end
+    -- Not before ns.InitBar placed the bar after a login in combat: re-anchoring the unplaced
+    -- bar would save its start position over the player's (ruleset plan
+    -- 2026-10-22-combat-login-position)
+    if not db or InCombatLockdown() or ns.barPending then return end
 
     -- The layout only when it changed (ruleset plan 2026-10-20-performance-pvp): the ticker runs
     -- this every second
@@ -392,8 +414,8 @@ function ns.Refresh(combatStart)
         -- A hidden button leaves no gap.
         local shown = {}
         for _, k in ipairs(db.order) do
-            local b, showKey = BUTTONS[k][1](), BUTTONS[k][2]
-            if db[showKey] then
+            local b = BUTTONS[k][1]()
+            if ns.ButtonShown(k) then
                 b:Show()
                 shown[#shown + 1] = b
             else
@@ -410,6 +432,8 @@ function ns.Refresh(combatStart)
     -- The planners read auras: not while the client keeps them secret, then the buttons keep
     -- what they had (third release review: the layout and settings must not wait for it)
     if not readable then return end
+    -- The planners see what was cast in combat: the marks of those casts go
+    for _, w in ipairs(ns.castWatch) do w.button.cast = nil end
     -- One read of the group for every planner and the overview
     ns.Blessings.WithRead(function()
         for _, fn in ipairs(ns.onRefresh) do fn(combatStart) end
@@ -426,6 +450,56 @@ local function Schedule()
         ns.Refresh()
     end)
 end
+
+---------------------------------------------------------------------------
+-- A cast in combat ends its button's glow (ruleset plan 2026-10-25-rank-glow-fixes). Auras are
+-- unreadable in combat and the refresh waits for its end; the cast event says what was cast.
+-- Count, secure action and buff key stay: nothing secure changes in combat.
+---------------------------------------------------------------------------
+ns.castWatch = {} -- { button, matches(spellId) }
+local inCombat = false -- InCombatLockdown() is still false while PLAYER_REGEN_DISABLED runs
+
+-- A button whose glow a cast of `matches` ends; its left clicks are remembered for a cast
+-- whose spell ID the client keeps secret
+function ns.WatchCast(b, matches)
+    ns.castWatch[#ns.castWatch + 1] = { button = b, matches = matches }
+    b:HookScript("OnClick", function(_, mouseButton)
+        if mouseButton == "LeftButton" then b.pressedAt = GetTime() end
+    end)
+end
+
+local function MarkCast(b)
+    b.cast = true
+    ns.SetAnts(b, false)
+end
+
+local casts = CreateFrame("Frame")
+casts:RegisterEvent("PLAYER_REGEN_DISABLED")
+casts:RegisterEvent("PLAYER_REGEN_ENABLED")
+casts:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+casts:SetScript("OnEvent", function(_, event, unit, _, spellId)
+    if event ~= "UNIT_SPELLCAST_SUCCEEDED" then
+        inCombat = event == "PLAYER_REGEN_DISABLED"
+        return
+    end
+    if unit ~= "player" or not inCombat then return end
+    if issecretvalue(spellId) then
+        -- The button left-clicked last, within the window - a press early in a fight must not
+        -- match a cast much later
+        local latest
+        for _, w in ipairs(ns.castWatch) do
+            local at = w.button.pressedAt
+            if at and GetTime() - at <= D.CAST_PRESS_WINDOW and (not latest or at > latest.button.pressedAt) then
+                latest = w
+            end
+        end
+        if latest then MarkCast(latest.button) end
+        return
+    end
+    for _, w in ipairs(ns.castWatch) do
+        if w.matches(spellId) then MarkCast(w.button) end
+    end
+end)
 
 local events = CreateFrame("Frame")
 for _, event in ipairs({ "GROUP_ROSTER_UPDATE", "UNIT_AURA", "SPELLS_CHANGED", "BAG_UPDATE_DELAYED",
@@ -466,6 +540,7 @@ local ticker
 -- At login. The bar is protected once it holds secure buttons, so after a /reload in
 -- combat its position waits for the end of combat.
 function ns.InitBar()
+    ns.ApplyAnchor()
     if InCombatLockdown() then
         ns.barPending = true
         return

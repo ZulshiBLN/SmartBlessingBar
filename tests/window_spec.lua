@@ -84,3 +84,62 @@ describe("the settings window", function()
         assert.are.equal(ns.locales.deDE.TAB_GENERAL, UI.tabs[1]:GetText())
     end)
 end)
+
+-- Window background (ruleset plan 2026-10-22-anchor-and-window-background, criterion 3): the
+-- dialog texture fades out below today's value, a black layer beneath it fills in above
+describe("the window background", function()
+    local function expected(ns, pct)
+        local o, d = pct / 100, ns.D.WINDOW_OPACITY_TODAY / 100
+        return math.min(1, o / d), math.max(0, (o - d) / (1 - d))
+    end
+    local function check(ns, window, pct)
+        local tex, layer = expected(ns, pct)
+        assert.is_true(math.abs(window.backdropColor[4] - tex) < 0.01, pct .. " % texture")
+        assert.is_true(math.abs(window.opacityLayer:GetAlpha() - layer) < 0.01, pct .. " % layer")
+        assert.are.equal(1, window:GetAlpha())
+    end
+
+    it("follows the slider in both windows, an open report at once, today's look at 60 %", function()
+        local ns, UI = login()
+        sbb("")
+        ns.OpenBugReport()
+        local report = ns.reportWindow
+        sbb("")
+        local slider = UI.controls.windowOpacity
+        for _, pct in ipairs({ 0, 30, 60, 80, 100 }) do
+            slider:SetValue(pct)
+            RUNSCRIPT(slider, "OnValueChanged", pct)
+            assert.are.equal(pct, SmartBlessingBarDB.windowOpacity)
+            check(ns, UI.window, pct)
+            check(ns, report, pct)
+        end
+        assert.are.same({ 1, 0 }, { expected(ns, 60) })
+        for _, w in ipairs({ UI.window, report }) do
+            assert.are.equal("BACKGROUND", w.opacityLayer.layer)
+            assert.is_true(w.opacityLayer.sublevel < w.Center.sublevel)
+        end
+    end)
+
+    it("opens a closed report with the value set meanwhile", function()
+        local ns = login()
+        ns.OpenBugReport()
+        local report = ns.reportWindow
+        report:Hide()
+        SmartBlessingBarDB.windowOpacity = 100
+        ns.OpenBugReport()
+        check(ns, report, 100)
+    end)
+
+    it("sits right of Scale in one row and takes 150 typed as 100", function()
+        local _, UI = login()
+        sbb("")
+        local c = UI.controls
+        local scaleRow, row = c.scaleSlider:GetParent(), c.windowOpacity:GetParent()
+        -- SetPoint("TOPLEFT", x, y)
+        assert.are.equal(select(3, scaleRow:GetPoint(1)), select(3, row:GetPoint(1)))
+        assert.is_true(select(2, row:GetPoint(1)) > select(2, scaleRow:GetPoint(1)))
+        c.windowOpacityBox:SetText("150")
+        RUNSCRIPT(c.windowOpacityBox, "OnEnterPressed")
+        assert.are.equal(100, SmartBlessingBarDB.windowOpacity)
+    end)
+end)

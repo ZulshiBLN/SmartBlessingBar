@@ -13,17 +13,52 @@ on:
       dry_run:
         type: boolean
         required: true
+    # Passed by release.yml's publish job only. GitHub resolves an environment secret in a
+    # called workflow only when the caller passes it by name; the jobs below that read them
+    # name the environment "release", which only v* tag runs may use (ruleset plan
+    # 2026-10-24-release-environment). The rehearsal passes none.
     secrets:
       CF_API_TOKEN:
-        required: true
+        required: false
       WAGO_API_TOKEN:
-        required: true
+        required: false
 
+# Only the github job writes (the release); it keeps the rights its caller gives - write from
+# release.yml, read in the CI rehearsal - as a called workflow can lower rights, never raise them.
 jobs:
-  curseforge:
+  # Before any channel publishes: both tokens arrived, and CurseForge takes its token and lists
+  # a WoW Forever version for the TOC. A failure here stops all three channels; a "filing
+  # under" warning is only logged (the release plan checks CurseForge's list before the tag).
+  preflight:
+    if: ${{ !inputs.dry_run }}
+    environment: release
     runs-on: ubuntu-24.04
+    permissions: { contents: read }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # nothing here pushes
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release
+          path: dist
+      - name: Both tokens are there, and CurseForge accepts its token
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+        run: |
+          [ -n "$WAGO_API_TOKEN" ] || { echo "WAGO_API_TOKEN did not arrive"; exit 1; }
+          [ -n "$CF_API_TOKEN" ] || { echo "CF_API_TOKEN did not arrive"; exit 1; }
+          bash .github/scripts/upload-curseforge.sh --dry-run dist/*.zip dist/notes.md
+
+  curseforge:
+    if: ${{ !inputs.dry_run }}
+    needs: preflight
+    environment: release
+    runs-on: ubuntu-24.04
+    permissions: { contents: read }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # nothing here pushes
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release
@@ -32,13 +67,32 @@ jobs:
       - name: Upload to CurseForge
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
-        run: bash .github/scripts/upload-curseforge.sh $DRY_RUN dist/*.zip dist/notes.md
+        run: bash .github/scripts/upload-curseforge.sh dist/*.zip dist/notes.md
 
-  wago:
+  # The rehearsal: everything but the upload, without a token - the game version from the TOC
+  curseforge-dry:
+    if: inputs.dry_run
     runs-on: ubuntu-24.04
+    permissions: { contents: read }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # nothing here pushes
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release
+          path: dist
+      - name: Upload to CurseForge - dry run
+        run: bash .github/scripts/upload-curseforge.sh --dry-run dist/*.zip dist/notes.md
+
+  wago:
+    if: ${{ !inputs.dry_run }}
+    needs: preflight
+    environment: release
+    runs-on: ubuntu-24.04
+    permissions: { contents: read }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # nothing here pushes
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release
@@ -47,36 +101,38 @@ jobs:
       - name: Upload to Wago
         env:
           WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
-          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
-        run: bash .github/scripts/upload-wago.sh $DRY_RUN dist/*.zip dist/notes.md
+        run: bash .github/scripts/upload-wago.sh dist/*.zip dist/notes.md
 
+  # The rehearsal without a token; Wago's version list is public
+  wago-dry:
+    if: inputs.dry_run
+    runs-on: ubuntu-24.04
+    permissions: { contents: read }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # nothing here pushes
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release
+          path: dist
+      - name: Upload to Wago - dry run
+        run: bash .github/scripts/upload-wago.sh --dry-run dist/*.zip dist/notes.md
+
+  # After a skipped preflight (the rehearsal) it runs; after a failed one it never does
   github:
+    needs: preflight
+    if: ${{ !cancelled() && needs.preflight.result != 'failure' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # nothing here pushes
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release
           path: dist
 
-      # A publish job must stop when the artifact is not there. In the
-      # rehearsal, downloading one that does not exist must fail.
-      - name: Control - a missing artifact stops the job
-        if: inputs.dry_run
-        id: missing
-        continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: no-such-artifact
-          path: missing
-      - name: Control - check that the missing artifact failed
-        if: inputs.dry_run
-        env:
-          OUTCOME: ${{ steps.missing.outcome }}
-        run: |
-          [ "$OUTCOME" = failure ] || { echo "downloading a missing artifact did not fail ($OUTCOME)"; exit 1; }
-          echo "downloading a missing artifact failed, as it must"
-
+      # A missing artifact stops the download above; the action is pinned to a commit, so that
+      # cannot change unnoticed. This step checks what the artifact holds.
       - name: The artifact holds the zip, release.json and the notes
         run: |
           [ "$(ls dist/*.zip | wc -l)" = 1 ] || { ls -la dist; echo "expected one zip"; exit 1; }

@@ -13,7 +13,7 @@
 ## Notes-zhCN: 圣骑士祝福管理：按职业为队伍施放祝福，与其他圣骑士协调并施放光环
 ## Notes-zhTW: 聖騎士祝福管理：依職業為隊伍施放祝福，與其他聖騎士協調並施放光環
 ## Author: ZulshiBLN
-## Version: 1.0.0
+## Version: 1.1.0
 ## X-License: MIT
 ## X-Curse-Project-ID: 1751962
 ## X-Wago-ID: ZKxO5o6k
@@ -44,8 +44,11 @@ Queue.lua
 Demo.lua
 Merchant.lua
 Minimap.lua
+Privacy.lua
+ReportCode.lua
 Report.lua
 Settings.lua
 SettingsPages.lua
 Overview.lua
 Main.lua
+Log.lua

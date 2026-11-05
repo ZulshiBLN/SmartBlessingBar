@@ -10,7 +10,7 @@ ns.D = D
 
 -- Schema version of SmartBlessingBarDB; a change to its shape raises it and ships a migration
 -- in ns.InitDB() (ruleset: project.md, Data)
-D.DB_VERSION = 11
+D.DB_VERSION = 12
 
 -- Salvation is no Blessing on Forever: it takes no blessing slot (checked in game,
 -- ruleset decisions 2026-10-19). Revoke, new on Forever, removes it.
@@ -110,8 +110,68 @@ D.CLASS_ORDER = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "
 -- 2026-10-19-blessing-core)
 D.DEFAULT_ORDER = { "AURA", "FURY", "BLESSING", "SALVATION" }
 
--- Where the bug report tells players to paste it
-D.BUG_REPORT_URL = "https://github.com/ZulshiBLN/SmartBlessingBar/issues"
+-- Where bug reports go: the issue form with one field for the code
+-- (.github/ISSUE_TEMPLATE/bug_report.yml)
+D.BUG_REPORT_URL = "https://github.com/ZulshiBLN/SmartBlessingBar/issues/new?template=bug_report.yml"
+
+-- Where a bug happened, as the report form offers it; the report carries the key, the form the
+-- text AREA_<key> (ruleset plan 2026-10-24-bug-report)
+D.REPORT_AREAS = { "BLESSINGS", "SALVATION", "AURA", "FURY", "BUFF_RUN", "PRIORITIES", "OVERVIEW",
+    "SUPPLIES", "KEYS", "SETTINGS", "COMBAT", "OTHER" }
+-- The fields a bug report holds, one pattern per kind of line, and nothing else: a spec checks
+-- every line of a report against this list. A new field needs an entry here and a line in
+-- README's privacy section first (ruleset plan 2026-10-24-bug-report).
+D.REPORT_FIELDS = {
+    { pattern = "^$" },
+    { pattern = "^## SmartBlessingBar bug report$" },
+    { pattern = "^%*%*Description:%*%* " },                 -- player's text, filtered
+    { pattern = "^%*%*Area:%*%* [%u_]+$" },
+    { pattern = "^%*%*Details:%*%* " },                     -- player's text, filtered
+    { pattern = "^%- Addon version: [%w%.%-]+$" },
+    { pattern = "^%- Client: [%w%.]+ %(build %w+, interface %d+%)$" },
+    { pattern = "^%- Client locale: %a+, addon language: [%a<>:%d]+$" }, -- a code or <text:N>
+    { pattern = "^%- Character: %u+, level %d+%-%d+, %a+$" }, -- class token, level band, group kind
+    { pattern = "^%- Settings: " },                         -- known keys, allowlisted values
+    { pattern = "^%*%*Lua errors" },
+    { pattern = "^Error %d+ %(x%d+, [%w ,]+, combat: %a+%):$" },
+    { pattern = "^```$" },
+    { pattern = "^msg " },                                  -- error message, filtered
+    { pattern = "^at " },                                   -- stack line, filtered
+    { pattern = "^local " },                                -- locals rebuilt by allowlist
+    { pattern = "^%*%*Last actions %(seconds since load%):%*%*$" },
+    { pattern = "^log " },                                  -- generated, allowlisted values
+    { pattern = "^%*%*State:%*%*$" },
+    { pattern = "^state " },                                -- generated, allowlisted values
+    { pattern = "^%*%*Loaded addons:%*%*$" },
+    { pattern = "^addon " },                                -- folder and version, filtered
+    { pattern = "^%[%.%.%. cut: the report is too long%]$" },
+}
+D.REPORT_CUT = "[... cut: the report is too long]"
+D.REPORT_MAX_BYTES = 20000 -- fits a GitHub issue (65,536) also as a code, and stays readable
+-- Strings a report may carry as they are; any other string becomes <text:N>, its length only.
+-- Settings keys and the addon's own keys (buttons, families, classes, roles) count as safe too.
+D.REPORT_SAFE = {
+    "^player$", "^target$", "^focus$", "^mouseover$", "^pet$", "^party%d$", "^raid%d%d?$", "^NPC$",
+    "^%-?%d+%.?%d*$", "^true$", "^false$", "^nil$",
+    "^spell$", "^macro$", "^type%d?$", "^spell%d?$", "^unit%d?$", "^macrotext%d?$",
+    "^UIParent$", "^TOP$", "^BOTTOM$", "^LEFT$", "^RIGHT$", "^CENTER$", "^TOPLEFT$", "^TOPRIGHT$",
+    "^BOTTOMLEFT$", "^BOTTOMRIGHT$",
+    "^%l%l%u%u$", "^auto$",                                 -- locale codes
+    "^/click SmartBlessingBarBuffRun LeftButton 1$", "^/targetfriendplayer$",
+}
+-- Characters that show nothing, as code point ranges: zero-width and format characters,
+-- direction marks, fillers, variation selectors, tag characters, line separators. Inside or
+-- beside a name they hide it, in a decoded report they hide text from the reader. The report
+-- drops them, tools/decode-report.lua shows them as <U+XXXX> (ruleset plan
+-- 2026-10-24-report-filter-fixes).
+D.HIDDEN = {
+    { 0xAD, 0xAD }, { 0x34F, 0x34F }, { 0x600, 0x605 }, { 0x61C, 0x61C }, { 0x6DD, 0x6DD },
+    { 0x70F, 0x70F }, { 0x890, 0x891 }, { 0x8E2, 0x8E2 }, { 0x115F, 0x1160 }, { 0x17B4, 0x17B5 },
+    { 0x180B, 0x180F }, { 0x200B, 0x200F }, { 0x2028, 0x202E }, { 0x2060, 0x206F },
+    { 0x3164, 0x3164 }, { 0xFE00, 0xFE0F }, { 0xFEFF, 0xFEFF }, { 0xFFA0, 0xFFA0 },
+    { 0xFFF0, 0xFFFB }, { 0x110BD, 0x110BD }, { 0x110CD, 0x110CD }, { 0x13430, 0x13455 },
+    { 0x1BCA0, 0x1BCA3 }, { 0x1D173, 0x1D17A }, { 0xE0000, 0xE007F }, { 0xE0100, 0xE01EF },
+}
 
 ---------------------------------------------------------------------------
 -- Look: SimpleConjureBar's, so both addons read as one family
@@ -151,6 +211,15 @@ D.MINIMAP_ICON_SIZE    = 21
 -- Settings with their defaults; numbers carry their range. Colors are copied into
 -- the settings, never referenced, so nothing written to the settings changes these tables.
 D.SCALE_MIN, D.SCALE_MAX = 0.5, 2.0
+-- The settings and report windows' background as it looked before it could be set, in percent:
+-- matched by eye in game for SimpleConjureBar, which draws the same dialog texture
+D.WINDOW_OPACITY_TODAY = 60
+-- Seconds a group member's buffs are kept between refreshes (ruleset plan
+-- 2026-10-24-kept-snapshots); his UNIT_AURA drops them sooner
+D.SNAPSHOT_MAX_AGE = 10
+-- Seconds a left click on a button counts for a cast in combat whose spell ID the client keeps
+-- secret (ruleset plan 2026-10-25-rank-glow-fixes)
+D.CAST_PRESS_WINDOW = 1
 D.ANTS_SPEED_MIN, D.ANTS_SPEED_MAX = 1, 5
 D.BOOL_DEFAULTS = {
     showBorder = true, vertical = false, growRev = false, hideCombat = false,
@@ -158,6 +227,7 @@ D.BOOL_DEFAULTS = {
     autoBuy = false, hideMinimap = false, showBlessing = true, showSalvation = true,
     buffRun = true, -- version 9 (ruleset plan 2026-10-20-buff-and-run)
     pvpBlessing = false, -- version 10 (ruleset plan 2026-10-20-performance-pvp)
+    showAnchor = true, -- version 12 (ruleset plan 2026-10-22-anchor-and-window-background)
 }
 D.COLOR_DEFAULTS = {
     bg            = D.BG_COLOR,
@@ -172,6 +242,8 @@ D.COLOR_DEFAULTS = {
 }
 D.NUMBER_DEFAULTS = {
     scale               = { default = 1, min = D.SCALE_MIN, max = D.SCALE_MAX },
+    -- Version 12 (ruleset plan 2026-10-22-anchor-and-window-background)
+    windowOpacity       = { default = D.WINDOW_OPACITY_TODAY, min = 0, max = 100, integer = true },
     -- Minutes before an aura of mine runs out at which it is renewed; 0 = once it ran out
     renewMinutes        = { default = 5, min = 0, max = 15, integer = true },
     -- The same for Righteous Fury, which lasts 30 minutes; version 11 (ruleset plan

@@ -36,8 +36,10 @@ describe("the look", function()
         end
     end)
 
-    it("shows the handle only while the mouse is over it", function()
+    it("shows the handle only while the mouse is over it, Show anchor off", function()
         local ns = login()
+        SmartBlessingBarDB.showAnchor = false
+        ns.ApplyAnchor()
         assert.are.equal(0, ns.handle:GetAlpha())
         RUNSCRIPT(ns.handle, "OnEnter")
         assert.are.equal(1, ns.handle:GetAlpha())

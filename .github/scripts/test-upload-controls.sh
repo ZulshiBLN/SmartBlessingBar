@@ -51,5 +51,17 @@ if bash "$here/check-no-token-output.sh" "$leak" > /dev/null 2>&1; then
 fi
 rm -f "$leak"
 
+
+# The CHANGELOG heading check passes a dated heading and refuses an undated,
+# an "Unreleased" and a missing one
+log=$(mktemp)
+printf '## [9.9.9] - 2026-10-22\n\n## [9.9.8]\n\n## [9.9.7] - Unreleased\n' > "$log"
+bash "$here/check-changelog-heading.sh" 9.9.9 "$log" > /dev/null || bad "the heading check refused a dated heading"
+for v in 9.9.8 9.9.7 9.9.6; do
+    if bash "$here/check-changelog-heading.sh" "$v" "$log" > /dev/null 2>&1; then
+        bad "the heading check accepted heading $v"
+    fi
+done
+rm -f "$log"
 [ "$failed" = 0 ] || exit 1
 echo "upload controls passed"

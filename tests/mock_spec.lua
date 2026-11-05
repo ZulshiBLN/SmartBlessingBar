@@ -248,3 +248,21 @@ describe("the mock's PvP flag", function()
         assert.is_false(UnitIsPVP("target"))
     end)
 end)
+
+-- A fixed order, so a spec can rely on one: in SimpleConjureBar the random order of pairs had
+-- hidden a lost-window bug (its 3ecc2ea)
+describe("the mock's events", function()
+    it("reach the frames in the order they first registered", function()
+        require("addon").load("enUS")
+        local order, expected = {}, {}
+        for i = 1, 30 do
+            local f = CreateFrame("Frame")
+            f:RegisterEvent("X_EVENT")
+            f:RegisterEvent("X_EVENT") -- registering again keeps the first place
+            f:SetScript("OnEvent", function() order[#order + 1] = i end)
+            expected[i] = i
+        end
+        FIRE("X_EVENT")
+        assert.are.same(expected, order)
+    end)
+end)

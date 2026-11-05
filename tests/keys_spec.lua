@@ -24,6 +24,7 @@ local function action(b) return { b:GetAttribute("type1"), b:GetAttribute("spell
 local function mine(id) return { spellId = id, expirationTime = 3600, mine = true } end
 local function carry(ns, ...)
     STATE.units.player.auras = { ... }
+    FIRE("UNIT_AURA", "player") -- as the client reports a change of a member's buffs
     ns.Refresh()
 end
 
@@ -79,6 +80,7 @@ describe("the buff key", function()
     it("takes the combat start's action and keeps it in combat", function()
         local _, key = login()
         STATE.units.player.auras = { mine(DEVOTION) }
+        FIRE("UNIT_AURA", "player")
         FIRE("PLAYER_REGEN_DISABLED")
         assert.are.same({ "spell", D.RIGHTEOUS_FURY, "player" }, action(key))
         STATE.combat = true

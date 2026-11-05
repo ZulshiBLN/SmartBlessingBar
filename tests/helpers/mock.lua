@@ -9,7 +9,9 @@
 -- connected, visible and range default to true, dead to false, level to 25.
 -- STATE.learned maps a spell ID to the level it is learned at; unset, the game gives none.
 local noop = function() end
-local eventFrames = {}
+-- Frames get events in the order they first registered: a fixed order, so a spec can rely on
+-- one (SimpleConjureBar 3ecc2ea: the random order of pairs had hidden a lost-window bug)
+local eventFrames, eventOrder = {}, {}
 STATE = {
   class = "PALADIN", locale = "deDE", errors = {},
   units = {},       -- unit token -> record; "player" is added by the loader
@@ -30,7 +32,10 @@ local Methods = {}
 local function Guard(self, what)
   if STATE.combat and self.protected then error("protected " .. what .. " in combat", 3) end
 end
-function Methods:RegisterEvent(e) self.events[e] = true; eventFrames[self] = true end
+function Methods:RegisterEvent(e)
+  self.events[e] = true
+  if not eventFrames[self] then eventFrames[self] = true; eventOrder[#eventOrder + 1] = self end
+end
 function Methods:UnregisterEvent(e) self.events[e] = nil end
 function Methods:SetScript(s, f) self.scripts[s] = f end
 function Methods:GetScript(s) return self.scripts[s] end
@@ -107,7 +112,14 @@ function Methods:SetBackdropBorderColor(r, g, b, a) self.borderColor = { r, g, b
 function Methods:StartMoving() Guard(self, "StartMoving"); self.moving = true end
 function Methods:StopMovingOrSizing() Guard(self, "StopMovingOrSizing"); self.moving = false end
 function Methods:RegisterForClicks(...) self.clicks = { ... } end
-function Methods:CreateTexture() return NEWOBJ("Texture") end
+-- A texture records its draw layer and sublevel, and its colour
+function Methods:CreateTexture(_, layer, _, sublevel)
+  local t = NEWOBJ("Texture")
+  t.layer, t.sublevel = layer, sublevel
+  return t
+end
+function Methods:SetDrawLayer(layer, sublevel) self.layer, self.sublevel = layer, sublevel end
+function Methods:SetColorTexture(r, g, b, a) self.color = { r, g, b, a } end
 -- A mask texture, and the masks a texture carries (texture.masks)
 function Methods:CreateMaskTexture() return NEWOBJ("MaskTexture") end
 function Methods:AddMaskTexture(mask)
@@ -126,6 +138,11 @@ function Methods:SetText(t)
   if self.kind == "Button" then self:GetFontString().text = t end
 end
 function Methods:GetText() return self.text end
+-- An edit box's selection: "all" for HighlightText(), "none" for HighlightText(0, 0); focus
+-- runs OnEditFocusGained, as in the client
+function Methods:HighlightText(a, b) self.selection = (a == nil and b == nil) and "all" or (a == b and "none" or "part") end
+function Methods:SetFocus() self.focused = true; RUNSCRIPT(self, "OnEditFocusGained") end
+function Methods:ClearFocus() self.focused = false end
 function Methods:GetFontString()
   self.fontString = rawget(self, "fontString") or NEWOBJ("FontString")
   return self.fontString
@@ -136,7 +153,15 @@ function Methods:IsMouseOver() return false end
 function Methods:GetName() return rawget(self, "name") end
 function Methods:GetPushedTexture() self.pushedTex = rawget(self, "pushedTex") or NEWOBJ("Texture"); return self.pushedTex end
 function Methods:GetHighlightTexture() self.hlTex = rawget(self, "hlTex") or NEWOBJ("Texture"); return self.hlTex end
-function Methods:SetBackdrop(b) self.backdrop = b end
+-- BackdropTemplate: SetBackdrop makes the centre piece the background is drawn on, in
+-- BACKGROUND
+function Methods:SetBackdrop(b)
+  self.backdrop = b
+  if not rawget(self, "Center") then
+    self.Center = NEWOBJ("Texture", nil, self)
+    self.Center.layer, self.Center.sublevel = "BACKGROUND", -8
+  end
+end
 function Methods:SetBackdropColor(r, g, b, a) self.backdropColor = { r, g, b, a } end
 function Methods:SetTexCoord(...) self.texCoord = { ... } end
 function Methods:SetTextColor(r, g, b, a) self.textColor = { r, g, b, a } end
@@ -391,6 +416,7 @@ PixelUtil = { SetSize = function(f, w, h) f:SetSize(w, h) end }
 -- The tooltip records its lines: { left, right or nil, r, g, b } per AddLine / AddDoubleLine
 GameTooltip = NEWOBJ("GameTooltip")
 function GameTooltip:SetOwner(owner, anchor) self.owner, self.anchor, self.lines = owner, anchor, {} end
+function GameTooltip:IsOwned(frame) return self.shown == true and self.owner == frame end
 function GameTooltip:AddLine(text, r, g, b) table.insert(self.lines, { text, nil, r, g, b }) end
 function GameTooltip:AddDoubleLine(left, right, r, g, b) table.insert(self.lines, { left, right, r, g, b }) end
 function GameTooltip:SetSpellByID(id) self.spell = id; self.shown = true end
@@ -433,7 +459,7 @@ tinsert = table.insert
 -- Runs every OnEvent script registered for the event; an error is recorded
 -- in STATE.errors, as BugGrabber would, instead of stopping the spec.
 function FIRE(event, ...)
-  for f in pairs(eventFrames) do
+  for _, f in ipairs(eventOrder) do
     if f.events[event] and f.scripts.OnEvent then
       local ok, err = pcall(f.scripts.OnEvent, f, event, ...)
       if not ok then table.insert(STATE.errors, event .. ": " .. tostring(err)) end
@@ -455,7 +481,18 @@ print = function(...)
   CHAT[#CHAT + 1] = table.concat(t, " ")
 end
 GetLocale = function() return STATE.locale end
-C_AddOns = { GetAddOnMetadata = TocField }
+-- The loaded addons: STATE.addons, { name, loaded, version } each; this addon alone without it
+C_AddOns = {
+  GetAddOnMetadata = function(addon, field)
+    for _, a in ipairs(STATE.addons or {}) do
+      if a.name == addon and field == "Version" then return a.version end
+    end
+    return TocField(addon, field)
+  end,
+  GetNumAddOns = function() return STATE.addons and #STATE.addons or 1 end,
+  IsAddOnLoaded = function(i) return not STATE.addons or STATE.addons[i].loaded ~= false end,
+  GetAddOnInfo = function(i) return STATE.addons and STATE.addons[i].name or "SmartBlessingBar" end,
+}
 SlashCmdList = {}
 InCombatLockdown = function() return STATE.combat end
 
@@ -471,8 +508,15 @@ UnitIsPlayer = function(u) local r = U(u) return r ~= nil and r.npc ~= true end
 UnitCanAssist = function(_, u) local r = U(u) return r ~= nil and r.hostile ~= true end
 -- Flagged for PvP when the record says `pvp`
 UnitIsPVP = function(u) local r = U(u) return r ~= nil and r.pvp == true end
--- A player's GUID: the record's guid, else one made from the record, the same for every token
-UnitGUID = function(u) local r = U(u) return r and (r.guid or tostring(r)) end
+-- The player's PvP flag runs out (5 minutes) when STATE.pvpTimer is set
+IsPVPTimerRunning = function() return STATE.pvpTimer == true end
+-- A player's GUID: the record's guid, else one made from the record, the same for every token.
+-- STATE.guidAsked counts the calls per token.
+UnitGUID = function(u)
+  STATE.guidAsked = STATE.guidAsked or {}
+  STATE.guidAsked[u] = (STATE.guidAsked[u] or 0) + 1
+  local r = U(u) return r and (r.guid or tostring(r))
+end
 -- The group role the game reports: the record's role, else "NONE"
 -- Forever has no realms: the second value is the character's second name (decisions.md,
 -- 2026-10-18), here the record's `surname`
@@ -540,9 +584,22 @@ C_Secrets = setmetatable({}, { __index = function(_, k)
   end
 end })
 C_Spell = {
-  IsSpellInRange = function(_, u) local r = U(u) return r ~= nil and r.range ~= false end,
-  GetSpellTexture = function(id) return "icon" .. id end,
-  GetSpellName = function(id) return "spell" .. id end,
+  -- The client gives no answer for a spell the player does not know
+  IsSpellInRange = function(id, u)
+    if not (STATE.known and STATE.known[id]) then return nil end
+    local r = U(u) return r ~= nil and r.range ~= false
+  end,
+  -- STATE.removed[id]: the client no longer has the spell (ruleset plan
+  -- 2026-11-05-removed-spells), as live build 70790 answers
+  DoesSpellExist = function(id) return not (STATE.removed and STATE.removed[id]) end,
+  GetSpellTexture = function(id)
+    if STATE.removed and STATE.removed[id] then return nil end
+    return "icon" .. id
+  end,
+  GetSpellName = function(id)
+    if STATE.removed and STATE.removed[id] then return nil end
+    return "spell" .. id
+  end,
   GetSpellLevelLearned = function(id) return STATE.learned and STATE.learned[id] end,
   -- STATE.gcd: the global cooldown runs, 1.5 s from GetTime
   GetSpellCooldown = function()
@@ -577,16 +634,30 @@ BuyMerchantItem = function(i, quantity)
   STATE.money = STATE.money - quantity * w.price / w.stack
 end
 -- Who the player is, as Forever answers: a first and a second name, the second where a realm
--- used to be. STATE.secretName makes the name a secret value.
-UnitFullName = function() return "Zulshe", "Keshmar" end
-GetRealmName = function() return "Forever" end
+-- used to be - made up, the player record's name and surname when it has them.
+-- STATE.secretName makes the name a secret value.
+UnitFullName = function()
+  local r = STATE.units.player or {}
+  return r.name or "Aldric", r.surname or "Vane"
+end
+GetRealmName = function() return STATE.realm or "Forever" end
+-- STATE.normalizedRealm: the realm without spaces, where it differs
+GetNormalizedRealmName = function() return STATE.normalizedRealm or STATE.realm or "Forever" end
+GetGuildInfo = function() return STATE.guild end
+-- The Unix clock, moving with STATE.now as GetTime does
+time = function() return 1800000000 + math.floor(STATE.now or 0) end
+GetCVar = function(name)
+  if name == "ActionButtonUseKeyDown" then return STATE.keyDown and "1" or "0" end
+end
 UnitLevel = function(u) local r = U(u or "player") return r and r.level or 25 end
 GetBuildInfo = function() return "1.60.1", "70450", "Oct 1 2026", 16001 end
 date = function() return "2026-10-18 12:00" end
 -- STATE.secrets: further values made secret, e.g. a spell ID
 issecretvalue = function(v)
   if STATE.secrets and STATE.secrets[v] then return true end
-  return STATE.secretName == true and (v == "Zulshe" or v == "Keshmar")
+  if STATE.secretName ~= true then return false end
+  local first, second = UnitFullName()
+  return v == first or v == second
 end
 -- The client's stack text; a fixed mark the specs find
 debugstack = function() return "STACK" end
@@ -630,5 +701,6 @@ C_CurrencyInfo = { GetCoinTextureString = function(copper) return copper .. "c" 
 IsPlayerSpell = function(id)
   STATE.spellChecks = STATE.spellChecks or {}
   STATE.spellChecks[id] = (STATE.spellChecks[id] or 0) + 1
+  if STATE.removed and STATE.removed[id] then return false end
   return STATE.known[id] == true
 end

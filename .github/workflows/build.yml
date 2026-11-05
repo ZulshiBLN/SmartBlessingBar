@@ -21,7 +21,18 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false # nothing here pushes
           fetch-depth: 0 # the packager versions from history, the tag check needs main
+
+      # On a branch push the packager builds nothing when HEAD already carries
+      # a tag ("Found future tag"), leaving that to the tag's run. A release
+      # merge pushed together with its tag hits this, and the main CI goes red
+      # with no zip (SimpleConjureBar v1.0.1); every re-run of it would too. A
+      # run without a tag checks the branch, so it drops HEAD's tags in this
+      # checkout only.
+      - name: Build the branch, not a pending tag
+        if: inputs.tag == ''
+        run: git tag --points-at HEAD | xargs -r git tag -d
 
       - name: Build the zip without publishing
         uses: BigWigsMods/packager@e50a250f8705041e40f2fa1ddcb280a686d65aa0 # v2.6.1
@@ -78,7 +89,32 @@ jobs:
           if bash .github/scripts/check-package.sh "$RUNNER_TEMP/nobind-zip/$(basename "$zip")" .release/release.json; then
               echo "the check accepted a zip without Bindings.xml"; exit 1
           fi
-          echo "the checks refused all four wrong packages, as they must"
+          # The report decoder stays out of the zip (ruleset plan 2026-10-24-bug-report)
+          withtools="$RUNNER_TEMP/withtools"
+          mkdir -p "$withtools" && unzip -q "$zip" -d "$withtools"
+          mkdir -p "$withtools/SmartBlessingBar/tools" && cp tools/decode-report.lua "$withtools/SmartBlessingBar/tools/"
+          mkdir -p "$RUNNER_TEMP/withtools-zip"
+          (cd "$withtools" && zip -q -r "$RUNNER_TEMP/withtools-zip/$(basename "$zip")" SmartBlessingBar)
+          if bash .github/scripts/check-package.sh "$RUNNER_TEMP/withtools-zip/$(basename "$zip")" .release/release.json; then
+              echo "the check accepted a zip with tools/"; exit 1
+          fi
+          # Only the addon's own files ship: a stray file is refused too (ruleset plan
+          # 2026-10-24-review-code-fixes)
+          stray="$RUNNER_TEMP/stray"
+          mkdir -p "$stray" && unzip -q "$zip" -d "$stray"
+          echo "notes" > "$stray/SmartBlessingBar/notes.txt"
+          mkdir -p "$RUNNER_TEMP/stray-zip"
+          (cd "$stray" && zip -q -r "$RUNNER_TEMP/stray-zip/$(basename "$zip")" SmartBlessingBar)
+          if bash .github/scripts/check-package.sh "$RUNNER_TEMP/stray-zip/$(basename "$zip")" .release/release.json; then
+              echo "the check accepted a zip with a stray file"; exit 1
+          fi
+          echo "the checks refused all six wrong packages, as they must"
+
+      - name: A release's CHANGELOG entry is dated
+        if: inputs.tag != ''
+        run: |
+          version=$(grep -m1 -E '^## Version:' SmartBlessingBar/SmartBlessingBar.toc | sed -E 's/^## Version:[[:space:]]*//' | tr -d '\r[:space:]')
+          bash .github/scripts/check-changelog-heading.sh "$version" SmartBlessingBar/CHANGELOG.md
 
       # A develop commit is never a merge in main, so the release workflow's
       # first check must refuse it; on main, and on a release tag, it must pass.
@@ -134,6 +170,31 @@ jobs:
           WAGO_VERSIONS_FILE="$wago" GAME_VERSION=1.99.9 bash .github/scripts/upload-wago.sh --dry-run "$zip" "$notes" > "$RUNNER_TEMP/wago.log" 2>&1
           check_fallback Wago "$RUNNER_TEMP/wago.log"
           echo "both sites refused a list without Forever and fell back with a warning, as they must"
+
+      # No upload token reaches CI (ruleset plan 2026-10-24-release-environment): both dry runs
+      # pass without one, and a real run without one stops before the network
+      - name: Upload controls - no token
+        env:
+          CF_API_TOKEN: ""
+          WAGO_API_TOKEN: ""
+        run: |
+          zip=$(ls .release/*.zip)
+          notes=.release/notes.md
+          wago="$RUNNER_TEMP/wago-list.json"
+          echo '{"patches":{"forever":["1.60.1"]}}' > "$wago"
+          bash .github/scripts/upload-curseforge.sh --dry-run "$zip" "$notes" > "$RUNNER_TEMP/cf-dry.log" 2>&1 \
+              || { cat "$RUNNER_TEMP/cf-dry.log"; echo "CurseForge: a dry run without a token failed"; exit 1; }
+          grep -q "from the TOC" "$RUNNER_TEMP/cf-dry.log" || { cat "$RUNNER_TEMP/cf-dry.log"; echo "CurseForge: no note on the TOC version"; exit 1; }
+          WAGO_VERSIONS_FILE="$wago" bash .github/scripts/upload-wago.sh --dry-run "$zip" "$notes" \
+              || { echo "Wago: a dry run without a token failed"; exit 1; }
+          for site in curseforge wago; do
+              if bash ".github/scripts/upload-$site.sh" "$zip" "$notes" > "$RUNNER_TEMP/$site-real.log" 2>&1; then
+                  echo "$site: a real run without a token passed"; exit 1
+              fi
+              grep -q "is not set" "$RUNNER_TEMP/$site-real.log" \
+                  || { cat "$RUNNER_TEMP/$site-real.log"; echo "$site: failed, but not for the missing token"; exit 1; }
+          done
+          echo "dry runs passed without tokens, real runs refused without them, as they must"
 
       # upload-artifact skips hidden directories such as .release, so the three
       # checked files move to a plain one rather than allowing hidden files.

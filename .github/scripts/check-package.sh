@@ -36,10 +36,27 @@ while IFS= read -r line; do
     [ -f "$dir/$line" ] || fail "the TOC lists $line, which is not in the zip"
 done < "$toc"
 
-# Nothing of the repository's tooling ships
-for path in tests .github .luacheckrc .busted .pkgmeta .gitignore .gitattributes .previews .media; do
-    [ ! -e "$dir/$path" ] || fail "$path must not ship"
-done
+# Nothing else ships: every file is one the TOC loads, the TOC itself, or one of the four
+# above, and every folder holds one of them. A list of what must not ship would let a file
+# added to the repository later through (ruleset plan 2026-10-24-review-code-fixes).
+lists=$(mktemp -d)
+trap 'rm -rf "$work" "$lists"' EXIT
+{
+    printf '%s\n' "$addon.toc" README.md LICENSE CHANGELOG.md Bindings.xml
+    while IFS= read -r line; do
+        line="${line%$'\r'}"
+        case "$line" in ''|'#'*) continue ;; esac
+        echo "${line//\\//}"
+    done < "$toc"
+} | sort -u > "$lists/files"
+# every folder above a listed file: libs/X/X.lua allows libs/X and libs
+awk -F/ '{ p = ""; for (i = 1; i < NF; i++) { p = p (i > 1 ? "/" : "") $i; print p } }' "$lists/files" | sort -u > "$lists/folders"
+(cd "$dir" && find . -mindepth 1 ! -type d | sed 's|^\./||' | sort) > "$lists/shipped"
+(cd "$dir" && find . -mindepth 1 -type d | sed 's|^\./||' | sort) > "$lists/shipped-folders"
+extra=$(comm -23 "$lists/shipped" "$lists/files")
+[ -z "$extra" ] || fail "not part of the addon, must not ship: $(echo $extra)"
+extra=$(comm -23 "$lists/shipped-folders" "$lists/folders")
+[ -z "$extra" ] || fail "a folder that is not part of the addon, must not ship: $(echo $extra)"
 
 field() { grep -m1 -E "^## $1:" "$toc" | sed -E "s/^## $1:[[:space:]]*//" | tr -d '\r[:space:]'; }
 interface=$(field Interface)

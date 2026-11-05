@@ -1,0 +1,3 @@
+# Blank issues stay possible: for anything that is no bug, and for players on an addon version
+# without the report code (ruleset plan 2026-10-24-bug-report)
+blank_issues_enabled: true

@@ -18,8 +18,12 @@ local SLOTS = { unpack(D.BLESSING_ORDER) }
 SLOTS[#SLOTS + 1] = "SALVATION"
 -- A row (Michel): 10 px, the name, 10 px, the aura, 5 px, the slots, 10 px to the column's edge
 local MARGIN, NAME_GAP, AURA_GAP = 10, 10, 5
-local SLOTS_W = #SLOTS * (ICON + ICON_GAP)
-local FIXED_W = MARGIN + NAME_GAP + ICON + AURA_GAP + SLOTS_W + MARGIN
+local FIXED_W = MARGIN + NAME_GAP + ICON + AURA_GAP + MARGIN
+-- Whether a slot's family or Salvation is in the client (ruleset plan 2026-11-05-removed-spells)
+local function SlotExists(family)
+    if family == "SALVATION" then return B.Exists(D.SALVATION) end
+    return B.FamilyExists(family)
+end
 -- A tank's or healer's role icon before the name, which moves in by its width and gap; the
 -- others' names keep the whole field (Michel, compared in game)
 local ROLE_SIZE, ROLE_GAP = 14, 2
@@ -67,8 +71,11 @@ local function ShowIconTooltip(slot)
     if c then
         local giver = c.by
         if not giver then
+            -- In an instance a name can be secret: asked first, and then "another paladin"
+            -- (ruleset plan 2026-10-25-rank-glow-fixes)
             local unit = c.source and B.InGroup(c.source)
-            giver = unit and (UnitName(unit))
+            local name = unit and (UnitName(unit))
+            if not issecretvalue(name) and name then giver = name end
         end
         GameTooltip:AddLine(L.OV_FROM:format(giver or L.OV_ANOTHER), 1, 1, 1)
         if c.expires > 0 then
@@ -117,17 +124,22 @@ local function NewRow(i)
     return row
 end
 
--- Places a row's parts for a column `colW` wide: the name takes what the rest leaves
-local function LayRow(row, colW)
+-- Places a row's parts for a column `colW` wide: the name takes what the rest leaves. `exists`
+-- maps each slot's family to whether the client has it, asked once per build.
+local function LayRow(row, colW, exists)
     row:SetSize(colW, ROW_H)
-    local nameW = colW - FIXED_W
+    local placed = {}
+    for _, slot in ipairs(row.slots) do
+        slot:ClearAllPoints()
+        if exists[slot.family] then placed[#placed + 1] = slot end
+    end
+    local nameW = colW - FIXED_W - #placed * (ICON + ICON_GAP)
     row.nameW = nameW -- the name's field; FillRow places the name in it, after a role icon
     local x = MARGIN + nameW + NAME_GAP
     row.aura:ClearAllPoints()
     row.aura:SetPoint("LEFT", x, 0)
     x = x + ICON + AURA_GAP
-    for s, slot in ipairs(row.slots) do
-        slot:ClearAllPoints()
+    for s, slot in ipairs(placed) do
         slot:SetPoint("LEFT", x + (s - 1) * (ICON + ICON_GAP), 0)
     end
 end
@@ -194,13 +206,15 @@ local function Build()
 
     local colW = math.floor(host.scroll:GetWidth() / 2)
     local left = math.ceil(#members / 2)
+    local exists = {}
+    for _, family in ipairs(SLOTS) do exists[family] = SlotExists(family) end
     for i, d in ipairs(members) do
         local row = frame.rows[i] or NewRow(i)
         local column, line = 0, i - 1
         if i > left then column, line = 1, i - left - 1 end
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", column * colW, -line * ROW_H)
-        LayRow(row, colW)
+        LayRow(row, colW, exists)
         FillRow(row, d)
     end
     for i = #members + 1, #frame.rows do frame.rows[i]:Hide() end

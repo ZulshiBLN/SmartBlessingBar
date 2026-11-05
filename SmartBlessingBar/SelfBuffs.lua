@@ -34,6 +34,10 @@ local aura = NewButton("SmartBlessingBarAura", "auraAntsColor", "auraAntsSpeed")
 local fury = NewButton("SmartBlessingBarFury", "furyAntsColor", "furyAntsSpeed")
 ns.auraButton, ns.furyButton = aura, fury
 
+-- A cast of the chosen aura family, or of Righteous Fury, in combat ends that glow (Bar.lua)
+ns.WatchCast(aura, function(id) return aura.family ~= nil and B.AURA_FAMILY[id] == aura.family end)
+ns.WatchCast(fury, function(id) return id == D.RIGHTEOUS_FURY end)
+
 -- Whether the paladin's own aura of this family is on him; another paladin's does not count
 -- Read in demo mode too: the glow follows the real aura there
 local function OwnAuraUp(family)
@@ -56,6 +60,7 @@ local function Update()
     -- None known: the first family on the list, rank 1, greyed and without ants. Hidden, the
     -- button chooses nothing and leaves nothing a /click could cast.
     local family = db.showAura and B.ChooseAura() or nil
+    aura.family = family
     local spell = family and B.Best(D.AURAS[family])
     aura.shownSpell = spell or D.AURAS[db.auraList[1]][1]
     SetSpell(aura, spell)
@@ -66,7 +71,7 @@ local function Update()
     -- check sets it; alone the game reports none (Michel, 2026-10-19). Demo mode reads no role.
     -- Hidden, it casts nothing and does not glow, as the aura button
     local known = db.showFury and B.Known(D.RIGHTEOUS_FURY)
-    local tank = not ns.IsDemo() and UnitGroupRolesAssigned("player") == "TANK"
+    local tank = not ns.IsDemo() and B.Readable(UnitGroupRolesAssigned("player")) == "TANK"
     SetSpell(fury, known and D.RIGHTEOUS_FURY or nil)
     ns.SetIcon(fury, C_Spell.GetSpellTexture(D.RIGHTEOUS_FURY), not (known and tank))
     ns.SetAnts(fury, known and tank and not FuryHolds())

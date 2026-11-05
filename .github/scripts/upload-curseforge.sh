@@ -6,7 +6,8 @@
 #
 # Usage: upload-curseforge.sh [--dry-run] <zip> <notes.md>
 # The token comes from CF_API_TOKEN and is never printed.
-# --dry-run resolves the game version and builds the payload, uploads nothing.
+# --dry-run resolves the game version and builds the payload, uploads nothing;
+# without a token it takes the version from the TOC and the ID 0.
 # For the CI controls only, with --dry-run: CF_VERSIONS_FILE replaces the
 # site's version list, GAME_VERSION the version the TOC asks for.
 set -euo pipefail
@@ -29,19 +30,26 @@ project=$(toc_field X-Curse-Project-ID)
 label="v$(toc_field Version)"
 target=${GAME_VERSION:-$(interface_to_version "$(toc_field Interface)")}
 
-if [ -n "${CF_VERSIONS_FILE:-}" ]; then
-    versions=$(cat "$CF_VERSIONS_FILE")
+if [ -n "$dry" ] && [ -z "${CF_VERSIONS_FILE:-}" ] && [ -z "${CF_API_TOKEN:-}" ]; then
+    # The rehearsal runs without the token (ruleset plan 2026-10-24-release-environment):
+    # the version list needs it, so the version comes from the TOC and the ID stays 0
+    chosen=$target
+    id=0
+    echo "CurseForge: no token in a dry run - version $chosen from the TOC, the live list not checked"
 else
-    [ -n "${CF_API_TOKEN:-}" ] || fail "CF_API_TOKEN is not set"
-    # The version list needs the token, so this also proves CurseForge takes it
-    versions=$(curl -sS -f -H "x-api-token: $CF_API_TOKEN" "$api/game/wow/versions") \
-        || fail "CurseForge refused the version list - is CF_API_TOKEN valid?"
+    if [ -n "${CF_VERSIONS_FILE:-}" ]; then
+        versions=$(cat "$CF_VERSIONS_FILE")
+    else
+        [ -n "${CF_API_TOKEN:-}" ] || fail "CF_API_TOKEN is not set"
+        # The version list needs the token, so this also proves CurseForge takes it
+        versions=$(curl -sS -f -H "x-api-token: $CF_API_TOKEN" "$api/game/wow/versions") \
+            || fail "CurseForge refused the version list - is CF_API_TOKEN valid?"
+    fi
+    chosen=$(jq -r --argjson t "$forever_type" '.[] | select(.gameVersionTypeID == $t) | .name' <<< "$versions" \
+        | resolve_game_version "$target")
+    id=$(jq -r --argjson t "$forever_type" --arg v "$chosen" \
+        '[.[] | select(.gameVersionTypeID == $t and .name == $v) | .id][0]' <<< "$versions")
 fi
-
-chosen=$(jq -r --argjson t "$forever_type" '.[] | select(.gameVersionTypeID == $t) | .name' <<< "$versions" \
-    | resolve_game_version "$target")
-id=$(jq -r --argjson t "$forever_type" --arg v "$chosen" \
-    '[.[] | select(.gameVersionTypeID == $t and .name == $v) | .id][0]' <<< "$versions")
 
 payload=$(jq -n --arg label "$label" --argjson id "$id" --rawfile changelog "$notes" \
     '{displayName: $label, gameVersions: [$id], releaseType: "release",

@@ -3,6 +3,77 @@
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-11-05
+
+### Added
+
+- **Show anchor** on the General tab, on by default: the bar's handle stays visible, so a new
+  player finds where to move the bar and open the settings. Off, it shows only under the mouse.
+- **Window background (%)** beside Scale: the settings and report windows' background from
+  none to solid; 60 keeps the look they always had.
+- **A new bug report**: say what happened, where - a list - and details. The report adds this
+  addon's errors of the session with whether they came in combat, its last actions and the state
+  of its buttons and queues, and shows it all as one code for the GitHub form the link opens;
+  "Show content" shows what the code holds.
+
+### Changed
+
+- Salvation, Mass Salvation, Revoke and Blessing of Light, which Blizzard removed shortly before
+  launch, leave the bar, the settings and demo mode. They return by themselves if the game brings
+  them back.
+- Group members' buffs are read again only when the game reports a change, or after 10 s,
+  instead of every second: alone about ten times fewer reads, less memory churn in raids.
+- Buff & Run blesses players flagged for PvP while you are flagged for good yourself - /pvp,
+  the portrait menu, a battleground, an arena or a PvP zone. A flag that runs out, as after
+  blessing a flagged player, does not count.
+- Every tooltip lists the clicks left, middle, right; the aura and Righteous Fury buttons name
+  whom their left click reaches. The minimap button and the AddOn menu say "Lock bar" and
+  "Unlock bar".
+
+### Fixed
+
+- The blessing button's tooltip says when everyone who still needs a cast is
+  out of range, instead of "Nothing left to cast".
+- The aura button moves on when another paladin runs the same aura as you. The game shows only
+  one of two equal auras, so his stayed hidden and yours looked free.
+- A right click on the minimap button or in the AddOn menu shows the new lock state in the
+  open tooltip at once, not only after the mouse left and came back.
+- In demo mode Buff & Run names what it would cast for other players too, not only for you:
+  a rank you have not learned yet no longer counts as out of range.
+- After a login or `/reload` in combat the bar no longer jumps to its start place for good
+  when combat ends.
+- Buff & Run no longer raises a Lua error when the game reports no cooldown for the chosen
+  blessing, as for a rank demo mode counts as known.
+- A settings file whose version got lost keeps your aura and class priority lists; they were
+  reset to the defaults.
+- Your own weaker blessing is renewed: after you learn a higher rank, and where your Greater
+  Blessing is stronger than the normal one a member carries, also through Buff & Run. Before,
+  it counted as done until it ran out.
+- A button's highlight goes out once its spell is cast in combat; it stayed on until the fight
+  ended, in an instance even longer.
+- The overview's tooltip no longer raises a Lua error in an instance, where the game may keep a
+  player's name secret: it then says "another paladin".
+- Group members' buffs, kept between reads, are checked for values the game keeps secret
+  before anything else is done with them, as the game requires in combat and instances.
+- Other values the game may keep secret in an instance - who is who, a class, a level, a PvP flag,
+  the spell cooldown - are checked before they are used, so they raise no Lua error.
+
+### Security
+
+- The bug report holds no date or clock and no settings it does not know, and filters your
+  character - both of its names on Forever - realm and guild, your current group, pets, target and
+  focus, also beside punctuation, in Chinese, Japanese and Korean text and in Latin-1 and Cyrillic
+  capitals, and GUIDs, BattleTags, also at the start of a text, e-mail addresses, absolute file
+  paths, colour, texture and link codes and characters that show nothing, from what you write and
+  from errors. It opens out of combat only and not while a name cannot be read. README explains
+  what it holds, what can remain and how reports are handled.
+- The release workflows give the CurseForge and Wago uploads read rights only, and no step keeps
+  GitHub's access token in the checked-out repository.
+- The CurseForge and Wago upload tokens reach only a release's own run, through a protected
+  GitHub environment; the checks on every other push run without them.
+- A release ships only the addon's own files: the package check refuses any file or folder the
+  addon does not load, not only a known list of tooling.
+
 ## [1.0.0] - 2026-10-21
 
 ### Added

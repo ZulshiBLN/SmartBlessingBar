@@ -219,21 +219,27 @@ function ns.InitDB()
     -- Version 8 (ruleset plan 2026-10-19-priorities): blessing lists by class instead of by
     -- role, auras by a list instead of one choice, the flyout settings gone. A class takes the
     -- saved list of its default role; the saved aura leads the aura list. Before the checks
-    -- below, which would replace both with their defaults.
+    -- below, which would replace both with their defaults. Each conversion runs only on its
+    -- old input: a file whose version got lost keeps its current lists (code.md, migrations
+    -- safe to run twice).
     if (tonumber(db.dbVersion) or 0) < 8 then
-        local auraList = {}
-        if D.AURAS[db.aura] then auraList[1] = db.aura end
-        for _, family in ipairs(D.AURA_ORDER) do
-            if family ~= db.aura then auraList[#auraList + 1] = family end
-        end
-        db.auraList = auraList
-        local classLists = {}
-        if type(db.roleLists) == "table" then
-            for _, class in ipairs(D.CLASS_ORDER) do
-                classLists[class] = ValidList(db.roleLists[D.CLASS_ROLES[class][1]], class)
+        if type(db.auraList) ~= "table" then
+            local auraList = {}
+            if D.AURAS[db.aura] then auraList[1] = db.aura end
+            for _, family in ipairs(D.AURA_ORDER) do
+                if family ~= db.aura then auraList[#auraList + 1] = family end
             end
+            db.auraList = auraList
         end
-        db.classLists = classLists
+        if type(db.classLists) ~= "table" or type(db.roleLists) == "table" then
+            local classLists = {}
+            if type(db.roleLists) == "table" then
+                for _, class in ipairs(D.CLASS_ORDER) do
+                    classLists[class] = ValidList(db.roleLists[D.CLASS_ROLES[class][1]], class)
+                end
+            end
+            db.classLists = classLists
+        end
         db.aura, db.roleLists = nil, nil
         db.flyoutAutoClose, db.flyoutAutoCloseTime, db.flyoutDir = nil, nil, nil
     end

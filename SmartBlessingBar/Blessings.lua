@@ -14,6 +14,14 @@ ns.OnDBReady(function(d) db = d end)
 local B = {}
 ns.Blessings = B
 
+-- A value the game may keep secret, or nil while it does: a truth test on a secret raises. As a
+-- precaution for what the API docs mark or may mark so (ruleset plan
+-- 2026-11-05-report-filter-guards); secret therefore reads as "no", unless a caller says otherwise
+function B.Readable(v)
+    if issecretvalue(v) then return nil end
+    return v
+end
+
 -- Whether the client lets the addon read auras now. Not in combat; and since Midnight, in
 -- instances and PvP it keeps them secret out of combat too and refuses a read with an error
 -- (BugSack, 2026-10-20). Where C_Secrets is missing, one read is tried.
@@ -42,7 +50,20 @@ end
 ---------------------------------------------------------------------------
 local read -- { auras = key -> list, known = id -> bool, level = unit -> level } during a read
 
-function B.BeginRead() read = { auras = {}, known = {}, level = {} } end
+-- A group member's buffs kept beyond the read (ruleset plan 2026-10-24-kept-snapshots): GUID ->
+-- { list, at }, used while younger than D.SNAPSHOT_MAX_AGE and dropped on his UNIT_AURA, a
+-- roster change or a loading screen. Members only: the client reports UNIT_AURA for a unit
+-- that has a token, and a stranger Buff & Run just blessed has lost `target` before his buff
+-- lands. A kept list is read-only.
+local kept = {}
+
+function B.BeginRead()
+    read = { auras = {}, known = {}, level = {} }
+    local now = GetTime()
+    for guid, k in pairs(kept) do
+        if now - k.at >= D.SNAPSHOT_MAX_AGE then kept[guid] = nil end
+    end
+end
 function B.EndRead() read = nil end
 
 -- The error with the stack where it happened, for BugSack, as a rethrow would lose it
@@ -65,7 +86,7 @@ end
 -- client withholds or keeps secret falls back to the token
 local function PersonKey(unit)
     local guid = UnitGUID(unit)
-    if guid == nil or issecretvalue(guid) then return unit end
+    if issecretvalue(guid) or guid == nil then return unit end
     return guid
 end
 
@@ -95,6 +116,18 @@ end
 
 local NONE = {}
 
+-- A token that names a group member: the client keeps reporting his UNIT_AURA under it
+local function GroupToken(unit)
+    return unit == "player" or unit:find("^party%d$") ~= nil or unit:find("^raid%d%d?$") ~= nil
+end
+
+-- How many members' buffs are kept, for the bug report's state
+function B.KeptCount()
+    local n = 0
+    for _ in pairs(kept) do n = n + 1 end
+    return n
+end
+
 -- The buffs a unit carries. Demo mode reads none; `real` reads them there too - the aura
 -- button's own aura - kept apart from demo mode's empty answer.
 function B.Auras(unit, real)
@@ -103,20 +136,62 @@ function B.Auras(unit, real)
     if not read then return Scan(unit) end
     local key = PersonKey(unit)
     local list = read.auras[key]
-    if not list then
+    if list then return list end
+    -- A key that is the token itself has no GUID behind it: never kept. B.BeginRead already
+    -- drops lists past D.SNAPSHOT_MAX_AGE; the age test keeps the rule here on its own (F-09).
+    local k = key ~= unit and kept[key]
+    if k and GetTime() - k.at < D.SNAPSHOT_MAX_AGE then
+        list = k.list
+    else
         list = Scan(unit)
-        read.auras[key] = list
+        if key ~= unit and GroupToken(unit) then kept[key] = { list = list, at = GetTime() } end
     end
+    read.auras[key] = list
     return list
 end
 
--- The one test of a known spell; in demo mode every spell counts as known
+local keptEvents = CreateFrame("Frame")
+keptEvents:RegisterEvent("UNIT_AURA")
+keptEvents:RegisterEvent("GROUP_ROSTER_UPDATE")
+keptEvents:RegisterEvent("PLAYER_ENTERING_WORLD")
+keptEvents:SetScript("OnEvent", function(_, event, unit)
+    if event == "UNIT_AURA" then
+        -- Lists are kept under group tokens only, and a member's group token always fires;
+        -- nameplates and the like fire far more often and need no GUID
+        if not (unit and GroupToken(unit)) then return end
+        local guid = UnitGUID(unit)
+        if not issecretvalue(guid) and guid then kept[guid] = nil end
+    else
+        kept = {}
+    end
+end)
+
+-- Whether the client has the spell at all. Blizzard removed Salvation, Mass Salvation, Revoke and
+-- Blessing of Light shortly before launch; asked each time, so one that returns shows by itself
+-- (ruleset plan 2026-11-05-removed-spells)
+function B.Exists(id)
+    return not C_Spell.DoesSpellExist or C_Spell.DoesSpellExist(id)
+end
+
+-- Whether any normal rank of a blessing family exists
+function B.FamilyExists(family)
+    for _, id in ipairs(D.BLESSINGS[family].normal) do
+        if B.Exists(id) then return true end
+    end
+    return false
+end
+
+local function Knows(id)
+    if not B.Exists(id) then return false end
+    return ns.IsDemo() or IsPlayerSpell(id)
+end
+
+-- The one test of a known spell; in demo mode every spell the client has counts as known
 function B.Known(id)
-    if ns.IsDemo() then return true end
-    if not read then return IsPlayerSpell(id) end
+    if not read then return Knows(id) end
     local known = read.known[id]
     if known == nil then
-        known = IsPlayerSpell(id)
+        known = Knows(id)
         read.known[id] = known
     end
     return known
@@ -150,8 +225,13 @@ function B.Eligible(unit)
     return UnitExists(unit) and UnitIsConnected(unit) and not UnitIsDeadOrGhost(unit) and UnitIsVisible(unit)
 end
 
+-- The client gives no answer for a rank the player has not learned, which demo mode counts as
+-- known: there it counts as in range, so demo mode names what it would cast
 function B.InRange(spell, unit)
-    return UnitIsUnit(unit, "player") or C_Spell.IsSpellInRange(spell, unit) == true
+    if B.Readable(UnitIsUnit(unit, "player")) then return true end
+    local answer = C_Spell.IsSpellInRange(spell, unit)
+    if answer == nil and ns.IsDemo() then return true end
+    return answer == true
 end
 
 -- The level a spell is learned at, a constant of the spell, kept for the session. Only a
@@ -167,10 +247,10 @@ local function Learned(spell)
 end
 
 local function LevelOf(unit)
-    if not read then return UnitLevel(unit) end
+    if not read then return B.Readable(UnitLevel(unit)) end
     local level = read.level[unit]
     if level == nil then
-        level = UnitLevel(unit) or false
+        level = B.Readable(UnitLevel(unit)) or false
         read.level[unit] = level
     end
     return level or nil
@@ -204,10 +284,10 @@ end
 -- (Michel, 2026-10-19). Demo mode puts every class on the player, so it reads no role: each
 -- class shows its default.
 function B.RoleOf(unit, class)
-    local roles = D.CLASS_ROLES[class or select(2, UnitClass(unit))]
+    local roles = D.CLASS_ROLES[class or B.Readable(select(2, UnitClass(unit))) or ""]
     if not roles then return end
     if ns.IsDemo() then return roles[1] end
-    local reported = UnitGroupRolesAssigned(unit)
+    local reported = B.Readable(UnitGroupRolesAssigned(unit))
     for _, role in ipairs(roles) do
         if role == reported or (reported == "DAMAGER" and D.DAMAGE_ROLES[role]) then return role end
     end
@@ -257,14 +337,15 @@ end
 -- Blessings and Salvation renew with the Priorities tab's time
 local function Expiring(a) return B.Expiring(a, db.renewMinutes) end
 
--- The family of this paladin's blessing on a unit, normal or Greater, or nil - also when it
--- is about to run out
-local function MyBlessingOn(unit)
+-- The family and strength of this paladin's blessing on a unit, normal or Greater, or nil -
+-- also when it is about to run out, unless `evenExpiring`. A Greater rank's strength is the
+-- normal rank it equals, so the two compare (ruleset plan 2026-10-25-rank-glow-fixes).
+local function MyBlessingOn(unit, evenExpiring)
     for _, a in ipairs(B.Auras(unit)) do
         local rank = a.mine and RANKS[a.id]
         if rank and IS_BLESSING[rank.family] then
-            if Expiring(a) then return end
-            return rank.family
+            if Expiring(a) and not evenExpiring then return end
+            return rank.family, rank.strength or 0
         end
     end
 end
@@ -285,7 +366,9 @@ local Symbols = B.Symbols
 -- the unit - a normal rank or the best known Greater one fits - and others have not given
 -- (ruleset plan 2026-10-19-priorities: lists by class, roles no longer choose)
 function B.ChosenFamily(unit, class)
-    for _, family in ipairs(db.classLists[class or select(2, UnitClass(unit))].order) do
+    local list = db.classLists[class or B.Readable(select(2, UnitClass(unit))) or ""]
+    if not list then return end
+    for _, family in ipairs(list.order) do
         local f = D.BLESSINGS[family]
         local greater = B.Best(f.greater)
         if (B.Best(f.normal, unit) or (greater and B.Fits(greater, unit)))
@@ -296,10 +379,14 @@ function B.ChosenFamily(unit, class)
 end
 
 -- Done for this paladin: my blessing on the member, normal or Greater, is of the chosen
--- family. One of another family is replaced, so a change of list is cast at once
--- (Michel, 2026-10-19).
-local function Done(chosen, mine)
-    return mine ~= nil and mine == chosen
+-- family and no weaker than my best normal rank that fits him. One of another family is
+-- replaced, so a change of list is cast at once (Michel, 2026-10-19); a weaker one of mine
+-- counts as missing, as another paladin's does (Michel, 2026-10-25). An equal strength is
+-- never weaker, so nothing is cast again and again.
+local function Done(chosen, mine, strength, unit)
+    if mine == nil or mine ~= chosen then return false end
+    local best = select(2, B.Best(D.BLESSINGS[chosen].normal, unit)) or 0
+    return strength >= best
 end
 
 -- The Greater family of a class: the one chosen for most of its members, ties by
@@ -330,7 +417,7 @@ local function Roster()
     end
     for _, unit in ipairs(B.Members()) do
         -- A class without a list in Data.lua is left out: UnitClass is outside data
-        local class = select(2, UnitClass(unit))
+        local class = B.Readable(select(2, UnitClass(unit)))
         if D.CLASS_LISTS[class or ""] and B.Eligible(unit) then list[#list + 1] = { unit = unit, class = class } end
     end
     return list
@@ -343,16 +430,18 @@ end
 function B.PlanBlessings()
     local byClass, order = {}, {}
     for _, r in ipairs(Roster()) do
-        local mine = MyBlessingOn(r.unit)
-        local m = { unit = r.unit, chosen = B.ChosenFamily(r.unit, r.class), mine = mine }
-        m.done = Done(m.chosen, mine)
+        local mine, strength = MyBlessingOn(r.unit)
+        local m = { unit = r.unit, chosen = B.ChosenFamily(r.unit, r.class), mine = mine, strength = strength }
+        m.done = Done(m.chosen, mine, strength, r.unit)
         byClass[r.class] = byClass[r.class] or {}
         table.insert(byClass[r.class], m)
         order[#order + 1] = m
     end
 
     local symbols = Symbols()
-    local queue, covered = {}, {}
+    -- `far`: members in need out of range, so the tooltip can say why nothing is left
+    -- (SimpleConjureBar's F-04)
+    local queue, covered, far = {}, {}, 0
     for _, class in ipairs(D.CLASS_ORDER) do
         local members = byClass[class]
         local family = members and GreaterFamily(members)
@@ -361,14 +450,20 @@ function B.PlanBlessings()
         if spell then
             -- Only members in range count, so a cast that misses the others is not repeated.
             -- Members it does not fit count for nothing: they get a normal one that fits.
-            local lacking, target, exceptions = 0, nil, false
+            -- Members out of range count as far only if the Greater one covers them; if not,
+            -- the normal loop below counts them
+            local lacking, target, exceptions, farHere = 0, nil, false, 0
             for _, m in ipairs(members) do
                 m.fitsGreater = B.Fits(spell, m.unit)
                 if m.fitsGreater then
                     if m.chosen and m.chosen ~= family then exceptions = true end
+                    -- Mine of the family counts unless it is weaker than this Greater rank
+                    local needs = m.chosen == family and not (m.mine == family and m.strength >= greaterStrength)
                     if B.InRange(spell, m.unit) then
                         target = target or m.unit
-                        if m.chosen == family and m.mine ~= family then lacking = lacking + 1 end
+                        if needs then lacking = lacking + 1 end
+                    elseif needs then
+                        farHere = farHere + 1
                     end
                 end
             end
@@ -377,6 +472,7 @@ function B.PlanBlessings()
             local useGreater = greaterStrength > normalStrength
                 or (greaterStrength == normalStrength and IsInRaid() and lacking >= D.RAID_GREATER_MIN)
             if useGreater and (lacking == 0 or symbols > 0) then
+                far = far + farHere
                 if lacking > 0 then
                     symbols = symbols - 1
                     queue[#queue + 1] = { spell = spell, unit = target, greater = true, hold = exceptions, class = class }
@@ -393,9 +489,12 @@ function B.PlanBlessings()
             local spell = B.Best(D.BLESSINGS[m.chosen].normal, m.unit)
             if spell and B.InRange(spell, m.unit) then
                 queue[#queue + 1] = { spell = spell, unit = m.unit }
+            elseif spell then
+                far = far + 1
             end
         end
     end
+    queue.far = far
     return queue, Symbols() - symbols
 end
 
@@ -417,17 +516,20 @@ end
 -- Symbols the blessing queue already plans. Out of combat only.
 function B.PlanSalvation(symbolsUsed)
     if not B.Known(D.SALVATION) then return {} end
-    local byClass, classes, position = {}, {}, {}
+    -- `far`: non-tanks out of range who lack it, so the tooltip can say why nothing is left
+    local byClass, classes, position, far = {}, {}, {}, 0
     for i, r in ipairs(Roster()) do
         position[r] = i
+        local tank = B.RoleOf(r.unit, r.class) == "TANK"
         if B.InRange(D.SALVATION, r.unit) then
-            local tank = B.RoleOf(r.unit, r.class) == "TANK"
             local m = { unit = r.unit, tank = tank, has = HasSalvation(r.unit, not tank), at = r }
             if not byClass[r.class] then
                 byClass[r.class] = {}
                 classes[#classes + 1] = r.class
             end
             table.insert(byClass[r.class], m)
+        elseif not tank and not HasSalvation(r.unit, true) and B.Fits(D.SALVATION, r.unit) then
+            far = far + 1
         end
     end
 
@@ -467,6 +569,7 @@ function B.PlanSalvation(symbolsUsed)
     local queue = mass
     for _, e in ipairs(revoke) do queue[#queue + 1] = e end
     for _, e in ipairs(single) do queue[#queue + 1] = e end
+    queue.far = far
     return queue
 end
 
@@ -484,7 +587,7 @@ function B.Describe(unit, class)
     d.visible = demo or UnitIsVisible(unit)
     if d.visible and not demo then
         for _, a in ipairs(B.Auras(unit)) do
-            if class == "PALADIN" and B.AURA_FAMILY[a.id] and a.source and UnitIsUnit(a.source, unit) then
+            if class == "PALADIN" and B.AURA_FAMILY[a.id] and a.source and B.Readable(UnitIsUnit(a.source, unit)) then
                 d.aura = { spell = a.id, source = a.source, expires = 0 }
             end
             local rank = RANKS[a.id]
@@ -496,7 +599,8 @@ function B.Describe(unit, class)
         end
     end
     local chosen = B.ChosenFamily(unit, class)
-    if chosen and not Done(chosen, MyBlessingOn(unit)) then
+    local mine, strength = MyBlessingOn(unit)
+    if chosen and not Done(chosen, mine, strength, unit) then
         local f = D.BLESSINGS[chosen]
         d.next = { family = chosen, spell = B.Best(f.normal, unit) or B.Best(f.greater) }
     end
@@ -509,7 +613,7 @@ end
 -- The group member a source unit token stands for, or nil when the caster is not in the group
 function B.InGroup(source)
     for _, unit in ipairs(B.Members()) do
-        if UnitIsUnit(source, unit) then return unit end
+        if B.Readable(UnitIsUnit(source, unit)) then return unit end
     end
 end
 
@@ -518,7 +622,7 @@ function B.Overview()
     if ns.IsDemo() then return ns.DemoRaid() end
     local list = {}
     for _, unit in ipairs(B.Members()) do
-        local class = select(2, UnitClass(unit))
+        local class = B.Readable(select(2, UnitClass(unit)))
         if D.CLASS_LISTS[class or ""] then list[#list + 1] = B.Describe(unit, class) end
     end
     return list
@@ -544,17 +648,30 @@ local function TakenAuras()
     local members, subgroup = B.Members(), nil
     if IsInRaid() then
         for i, unit in ipairs(members) do
-            if UnitIsUnit(unit, "player") then subgroup = select(3, GetRaidRosterInfo(i)) end
+            if B.Readable(UnitIsUnit(unit, "player")) then subgroup = select(3, GetRaidRosterInfo(i)) end
         end
     end
     for i, unit in ipairs(members) do
-        if not UnitIsUnit(unit, "player") and select(2, UnitClass(unit)) == "PALADIN" and UnitIsVisible(unit)
+        -- A secret self check counts as neither: the player must not take himself for another
+        if B.Readable(UnitIsUnit(unit, "player")) == false and B.Readable(select(2, UnitClass(unit))) == "PALADIN"
+           and UnitIsVisible(unit)
            and (not subgroup or select(3, GetRaidRosterInfo(i)) == subgroup) then
+            -- Equal auras do not stack: while he runs mine, the game shows mine on him and hides
+            -- his (ruleset plan 2026-10-22-hidden-equal-aura). My aura on him with none of his
+            -- own counts as his. An aura without a source is neither.
+            local myFamily, ownShown = nil, false
             for _, a in ipairs(B.Auras(unit)) do
-                if AURA_FAMILY[a.id] and not (a.source and UnitIsUnit(a.source, "player")) then
-                    taken[AURA_FAMILY[a.id]] = true
+                local family = AURA_FAMILY[a.id]
+                if family then
+                    if a.source and B.Readable(UnitIsUnit(a.source, "player")) then
+                        myFamily = family
+                    else
+                        taken[family] = true
+                        ownShown = ownShown or (a.source ~= nil and B.Readable(UnitIsUnit(a.source, unit)))
+                    end
                 end
             end
+            if myFamily and not ownShown then taken[myFamily] = true end
         end
     end
     return taken
@@ -577,30 +694,31 @@ end
 -- Buff & Run (ruleset plan 2026-10-20-buff-and-run): what the blessing button's middle click
 -- casts on its target, any friendly player. Out of combat only.
 ---------------------------------------------------------------------------
--- Whether the unit carries a blessing of mine, normal or Greater, also one running out: a
--- second would replace it. Salvation and auras take no blessing slot and do not count.
-function B.HasMyBlessing(unit)
-    for _, a in ipairs(B.Auras(unit)) do
-        if a.mine and RANKS[a.id] then return true end
-    end
-    return false
-end
-
--- The spell for the unit: nil unless it is a friendly player, alive and in reach, carrying
--- no blessing of mine; else the first family of his class's list another paladin has not
--- given, in the best normal rank that fits him - Greater Blessings reach group members only
+-- The spell for the unit: nil unless it is a friendly player, alive and in reach; else the
+-- first family of his class's list another paladin has not given, in the best normal rank
+-- that fits him - Greater Blessings reach group members only. A blessing of mine on him,
+-- also one running out, stops it: one of another family is kept, one of this family unless
+-- it is weaker than that rank (Michel, 2026-10-25). Salvation and auras do not count.
 function B.BuffRunSpell(unit)
     if not B.AurasReadable() then return end
     if not (UnitIsPlayer(unit) and UnitCanAssist("player", unit) and B.Eligible(unit)) then return end
     -- Blessing a PvP-flagged player flags the paladin too: only when allowed (Michel,
-    -- 2026-10-20), whether the paladin is flagged or not
-    if not db.pvpBlessing and UnitIsPVP(unit) then return end
-    if B.HasMyBlessing(unit) then return end
-    local list = db.classLists[select(2, UnitClass(unit))]
+    -- 2026-10-20), or while the paladin is flagged for good - /pvp, the portrait menu, a
+    -- battleground, an arena or a PvP zone - and loses nothing. A flag that runs out came by
+    -- accident and does not count (Michel, 2026-10-22)
+    -- A secret answer: the target counts as flagged; the paladin does not count as flagged for good
+    local flagged = UnitIsPVP(unit)
+    if (issecretvalue(flagged) or flagged) and not db.pvpBlessing
+       and not (B.Readable(UnitIsPVP("player")) and not IsPVPTimerRunning()) then
+        return
+    end
+    local mine, strength = MyBlessingOn(unit, true)
+    local list = db.classLists[B.Readable(select(2, UnitClass(unit))) or ""]
     if not list then return end
     for _, family in ipairs(list.order) do
-        local spell = B.Best(D.BLESSINGS[family].normal, unit)
+        local spell, best = B.Best(D.BLESSINGS[family].normal, unit)
         if spell and not B.GivenByOthers(unit, family) then
+            if mine and (mine ~= family or strength >= best) then return end
             if B.InRange(spell, unit) then return spell end
             return
         end

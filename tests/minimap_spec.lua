@@ -76,8 +76,8 @@ describe("the minimap button", function()
         RUNSCRIPT(ns.minimapButton, "OnEnter")
         assert.are.equal("ANCHOR_LEFT", GameTooltip.anchor)
         assert.is_truthy(GameTooltip:GetText():find(ns.VERSION, 1, true))
-        assert.are.same({ " ", L.LEFTCLICK .. "|" .. L.SETTINGS, L.RIGHTCLICK .. "|" .. L.LOCK,
-                          L.MIDDLECLICK .. "|" .. L.TAB_PRIORITIES, L.DRAG .. "|" .. L.MOVE }, lines())
+        assert.are.same({ " ", L.LEFTCLICK .. "|" .. L.SETTINGS, L.MIDDLECLICK .. "|" .. L.TAB_PRIORITIES,
+                          L.RIGHTCLICK .. "|" .. L.LOCK_BAR, L.DRAG .. "|" .. L.MOVE }, lines())
     end)
 
     it("hides with the General setting, and stays hidden and in place after a login", function()
@@ -139,5 +139,20 @@ describe("the options entry", function()
         assert.is_true(window:IsShown())
         window:Hide()
         assert.are.equal("DIALOG", window:GetFrameStrata())
+    end)
+end)
+
+describe("the minimap button's right click", function()
+    it("shows the new lock state in the open tooltip at once", function()
+        local ns = login()
+        local L = ns.L
+        RUNSCRIPT(ns.minimapButton, "OnEnter")
+        RUNSCRIPT(ns.minimapButton, "OnClick", "RightButton")
+        assert.is_true(SmartBlessingBarDB.locked)
+        local found
+        for _, l in ipairs(GameTooltip.lines) do
+            if l[1] == L.RIGHTCLICK then found = l[2] end
+        end
+        assert.are.equal(L.UNLOCK_BAR, found)
     end)
 end)

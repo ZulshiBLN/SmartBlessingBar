@@ -147,6 +147,7 @@ describe("the blessing and Salvation buttons", function()
         RUNSCRIPT(bless, "OnEnter")
         assert.are.equal(M.normal[6], GameTooltip.spell)
         STATE.units.player.auras = { aura(M.normal[6], true) }
+        FIRE("UNIT_AURA", "player")
         ns.Refresh()
         RUNSCRIPT(bless, "OnEnter")
         assert.are.equal(ns.L.BTN_BLESSINGS, GameTooltip:GetText())
@@ -202,6 +203,7 @@ describe("the queue buttons' tooltips and right click", function()
         assert.are.equal(D.SALVATION, salv:GetAttribute("spell1"))
         assert.are.same({ { L.LEFTCLICK, "player" } }, tip(salv)) -- the player first, then Jaina
         STATE.units.player.auras = { aura(D.SALVATION, true) }
+        FIRE("UNIT_AURA", "player")
         ns.Refresh()
         assert.are.same({ { L.LEFTCLICK, "Jaina" } }, tip(salv))
     end)
@@ -240,6 +242,7 @@ describe("the queue buttons' tooltips and right click", function()
     it("name the right click on the blessing button also with nothing to cast", function()
         local ns, bless = login()
         STATE.units.player.auras = { aura(M.normal[6], true) }
+        FIRE("UNIT_AURA", "player")
         ns.Refresh()
         local lines = tip(bless)
         assert.are.equal(ns.L.BTN_BLESSINGS, GameTooltip:GetText())
@@ -266,5 +269,52 @@ describe("the queue buttons' tooltips and right click", function()
         RUNCLICK(bless, "RightButton", false)
         assert.is_false(ns.UI.window:IsShown())
         assert.is_truthy(CHAT[#CHAT]:find(ns.L.NOT_IN_COMBAT, 1, true))
+    end)
+
+    -- SimpleConjureBar's F-04: "nothing left" hid that the ones in need are out of range
+    it("say that everyone in need is out of range, not that nothing is left", function()
+        local ns, bless = login({ group = "party", units = {
+            player = { class = "PALADIN", auras = { aura(M.normal[6], true) } },
+            party1 = { class = "MAGE", range = false } } })
+        assert.is_nil(bless:GetAttribute("spell1"))
+        assert.are.same({ ns.L.QUEUE_OUT_OF_RANGE }, tip(bless)[1])
+        STATE.units.party1.range = nil
+        FIRE("UNIT_AURA", "party1")
+        RUNTIMERS()
+        assert.are.same({ ns.L.LEFTCLICK, "party1" }, tip(bless)[1])
+    end)
+
+    -- The 1.1.0 review's F-08: the Salvation button said "nothing left" for members out of range
+    it("say so for Salvation too", function()
+        local ns, _, salv = login({ group = "party", units = {
+            player = { class = "PALADIN", auras = { aura(M.normal[6], true), aura(D.SALVATION, true) } },
+            party1 = { class = "MAGE", range = false }, party2 = { class = "ROGUE", range = false } } })
+        assert.is_nil(salv:GetAttribute("spell1"))
+        assert.are.same({ ns.L.QUEUE_OUT_OF_RANGE }, tip(salv)[1])
+        -- out of range but not in need: carrying Salvation, a tank, too low for it
+        for _, far in ipairs({ { class = "MAGE", range = false, auras = { aura(D.SALVATION) } },
+                               { class = "WARRIOR", range = false, role = "TANK" },
+                               { class = "MAGE", range = false, level = 1 } }) do
+            ns, _, salv = login({ group = "party", units = {
+                player = { class = "PALADIN", auras = { aura(M.normal[6], true), aura(D.SALVATION, true) } },
+                party1 = far } })
+            STATE.learned = { [D.SALVATION] = 26 } -- fits from level 16
+            ns.Refresh()
+            assert.are.same({ ns.L.QUEUE_EMPTY }, tip(salv)[1], far.class .. tostring(far.role) .. tostring(far.level))
+        end
+    end)
+
+    -- The 1.1.0 review's F-07: a member out of range was counted in the Greater loop and again
+    it("count each member out of range once", function()
+        local ns = login({ group = "raid", units = {
+            player = { class = "PALADIN", auras = { aura(M.normal[6], true) } },
+            raid1 = { class = "PALADIN" },
+            raid2 = { class = "WARRIOR", range = false }, raid3 = { class = "WARRIOR", range = false },
+            raid4 = { class = "WARRIOR", range = false } } }, { M.greater[1] }, 0)
+        STATE.units.raid1 = STATE.units.player
+        ns.Refresh()
+        local line
+        for _, l in ipairs(ns.StateSnapshot()) do if l:find("^queue BLESSING ") then line = l end end
+        assert.is_truthy(line:find(" far=3$"), line)
     end)
 end)

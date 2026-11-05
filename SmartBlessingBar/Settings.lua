@@ -38,6 +38,7 @@ settings:SetBackdrop({
     tile = true, tileSize = 32, edgeSize = 32,
     insets = { left = 11, right = 12, top = 12, bottom = 11 },
 })
+ns.AddOpacityLayer(settings)
 tinsert(UISpecialFrames, "SmartBlessingBarSettings") -- closes with Escape
 
 -- The dialog border is about 12 px wide, plus 10 px space to the content
@@ -259,6 +260,11 @@ end
 -- each half as wide, the right one after the left (ruleset plan 2026-10-20-fury-renew).
 -- Returns the slider, the box and the row (its label as row.label).
 local COLUMN_GAP = 20
+UI.COLUMN_GAP = COLUMN_GAP -- the General tab's Scale row lays out its column with it
+
+-- The page being built, for a row laid out by hand as a left column
+function UI.CurrentPage() return page end
+
 function UI.AddNumberSlider(o)
     local range = D.NUMBER_DEFAULTS[o.key]
     local ROW = 42
@@ -376,6 +382,7 @@ function UI.AddSeparator()
         local half = math.floor(w * 0.4)
         for _, tex in ipairs(halves) do PixelUtil.SetSize(tex, half, SEP_HEIGHT) end
     end
+    return halves
 end
 
 -- Dropdown with the label on the left and the selection on the right, the client's menu
@@ -664,6 +671,7 @@ settings:SetScript("OnShow", function()
         if InCombatLockdown() then ns.Print(L.MENU_COMBAT) end
         return
     end
+    ns.ApplyWindowOpacity(settings)
     RefreshAll()
 end)
 

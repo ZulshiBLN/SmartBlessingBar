@@ -36,8 +36,10 @@ local function ShowTooltip(b)
         GameTooltip:AddDoubleLine(L.LEFTCLICK, Target(head), 1, 1, 1)
     else
         GameTooltip:SetText(b.title())
-        -- Entries left but none to cast: every one held at combat start
-        GameTooltip:AddLine(b.left > 0 and L.QUEUE_HELD or L.QUEUE_EMPTY, 1, 1, 1)
+        -- Nothing to cast now: every entry held at combat start, or everyone in need out of range
+        local why = L.QUEUE_EMPTY
+        if b.left > 0 then why = L.QUEUE_HELD elseif (b.queue and b.queue.far or 0) > 0 then why = L.QUEUE_OUT_OF_RANGE end
+        GameTooltip:AddLine(why, 1, 1, 1)
     end
     local middle = b.middleClickText and b.middleClickText()
     if middle then GameTooltip:AddDoubleLine(L.MIDDLECLICK, middle, 1, 1, 1) end
@@ -62,6 +64,11 @@ local blessing = NewQueueButton("SmartBlessingBarBlessing", "blessingAntsColor",
 local salvation = NewQueueButton("SmartBlessingBarSalvation", "salvationAntsColor",
     "salvationAntsSpeed", D.SALVATION, SalvationName)
 ns.blessingButton, ns.salvationButton = blessing, salvation
+
+-- A cast of the head in combat ends that button's glow (Bar.lua)
+for _, b in ipairs({ blessing, salvation }) do
+    ns.WatchCast(b, function(id) return b.head ~= nil and b.head.spell == id end)
+end
 
 -- Buff & Run (ruleset plan 2026-10-20-buff-and-run): the blessing button's middle click casts
 -- on the current target what B.BuffRunSpell chose for him, then targets the next friendly
@@ -90,11 +97,17 @@ end
 -- global cooldown the click does nothing at all, so no player is passed by. Demo mode casts
 -- nothing and says once, on the press, what it would cast.
 blessing:SetScript("PreClick", function(_, mouseButton, down)
+    -- In combat ns.SetAttr writes nothing anyway; the test spares the read (defence in depth
+    -- at the secure boundary, code review 1.1.0 F-09)
     if mouseButton ~= "MiddleButton" or InCombatLockdown() or not db.buffRun then return end
     -- No spell from an earlier click, should the choice below fail
     SetAttr(buffRun, "spell", nil)
     local spell = B.WithRead(function() return B.BuffRunSpell("target") end)
-    if spell and C_Spell.GetSpellCooldown(spell).startTime > 0 then
+    -- The client may answer no cooldown at all, as for a rank demo mode counts as known
+    local cd = spell and C_Spell.GetSpellCooldown(spell)
+    local started = cd and cd.startTime
+    -- A start the game keeps secret counts as no cooldown
+    if not issecretvalue(started) and started and started > 0 then
         SetAttr(blessing, "type3", nil)
         return
     end
@@ -163,9 +176,10 @@ local ACTION = { "type1", "spell1", "unit1" }
 local function ArmBuffKey()
     local source
     for _, key in ipairs(db.order) do
-        local entry = ns.BAR_BUTTONS[key]
-        local b = entry[1]()
-        if db[entry[2]] and b.antsShown then
+        local b = ns.BAR_BUTTONS[key][1]()
+        -- A hidden button's queue is empty already; asking too keeps the key from arming a button
+        -- that is off the bar, whatever its ants say (F-09)
+        if ns.ButtonShown(key) and b.antsShown then
             source = b
             break
         end
@@ -173,7 +187,15 @@ local function ArmBuffKey()
     for _, attr in ipairs(ACTION) do
         SetAttr(buffKey, attr, source and source:GetAttribute(attr) or nil)
     end
+    -- Out of combat only, as the attributes: in combat the key keeps the action it had
+    if not InCombatLockdown() then buffKey.source = source end
 end
+
+-- A press of the key counts as a left click on the button whose action it carries, for a cast
+-- in combat whose spell ID the client keeps secret (Bar.lua)
+buffKey:HookScript("OnClick", function(self, mouseButton)
+    if mouseButton == "LeftButton" and self.source then self.source.pressedAt = GetTime() end
+end)
 
 -- Demo mode casts nothing; a press says once, on the release, what it would cast
 buffKey:HookScript("OnClick", function(self, _, down)
@@ -192,7 +214,7 @@ table.insert(ns.onSettings, function(combatStart, readable)
     -- empties its own, and the combat start still skips held entries (final release review)
     if not readable then
         Show(blessing, db.showBlessing and blessing.queue or {}, combatStart)
-        Show(salvation, db.showSalvation and salvation.queue or {}, combatStart)
+        Show(salvation, ns.ButtonShown("SALVATION") and salvation.queue or {}, combatStart)
         ArmBuffKey()
     end
     if ns.IsDemo() then
@@ -210,6 +232,6 @@ table.insert(ns.onRefresh, function(combatStart)
     if db.showBlessing then queue, symbolsUsed = B.PlanBlessings() end
     Show(blessing, queue, combatStart)
     ns.RefreshSymbols()
-    Show(salvation, db.showSalvation and B.PlanSalvation(symbolsUsed) or {}, combatStart)
+    Show(salvation, ns.ButtonShown("SALVATION") and B.PlanSalvation(symbolsUsed) or {}, combatStart)
     ArmBuffKey()
 end)
