@@ -18,6 +18,9 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and v
 
 ### Changed
 
+- Salvation, Mass Salvation, Revoke and Blessing of Light, which Blizzard removed shortly before
+  launch, leave the bar, the settings and demo mode. They return by themselves if the game brings
+  them back.
 - Group members' buffs are read again only when the game reports a change, or after 10 s,
   instead of every second: alone about ten times fewer reads, less memory churn in raids.
 - Buff & Run blesses players flagged for PvP while you are flagged for good yourself - /pvp,
@@ -29,7 +32,7 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and v
 
 ### Fixed
 
-- The blessing and Salvation buttons' tooltips say when everyone who still needs a cast is
+- The blessing button's tooltip says when everyone who still needs a cast is
   out of range, instead of "Nothing left to cast".
 - The aura button moves on when another paladin runs the same aura as you. The game shows only
   one of two equal auras, so his stayed hidden and yours looked free.

@@ -2,7 +2,7 @@
 
 A paladin blessing manager for **WoW Forever** (Classic content on the modern Retail client,
 Interface 16001): it blesses your group by class, works around what other paladins already gave,
-and casts Salvation, auras and Righteous Fury, with a modern look.
+and casts auras and Righteous Fury, with a modern look.
 
 ![The bar, the handle's tooltip and the settings' General tab](.previews/03-general-settings.jpg)
 
@@ -27,8 +27,9 @@ The addon loads for paladins only.
 | Aura | Cast the first aura of your list no other paladin runs, highest rank you know - highlighted until it runs | – |
 | Righteous Fury | Cast Righteous Fury - highlighted while it is missing or about to run out (see the Priorities tab) and your group's role check made you tank; greyed otherwise, also alone | – |
 | Blessings | Cast the next blessing your group needs - highlighted while one is left | Open the Priorities tab |
-| Salvation | Cast the next Salvation, Mass Salvation or Revoke your group needs - highlighted while one is left | – |
 | Handle (the side the bar grows from; always shown, or only under the mouse with Show anchor off) | Drag to move | Lock or unlock |
+
+Blizzard removed Salvation, Mass Salvation, Revoke and Blessing of Light shortly before launch. The addon hides them and shows them again by itself if the game brings them back.
 
 A middle click on the handle opens or closes the settings; hover it for a tooltip with the
 lock state and its clicks.
@@ -65,11 +66,11 @@ know. In combat it keeps the aura chosen before.
 
   | Class | Default |
   |---|---|
-  | Warrior, Rogue | Might, Kings, Light |
-  | Paladin | Kings, Might, Wisdom, Light |
-  | Hunter | Kings, Wisdom, Might, Light |
-  | Shaman, Druid | Wisdom, Kings, Might, Light |
-  | Priest, Mage, Warlock | Wisdom, Kings, Light, Might |
+  | Warrior, Rogue | Might, Kings |
+  | Paladin | Kings, Might, Wisdom |
+  | Hunter | Kings, Wisdom, Might |
+  | Shaman, Druid | Wisdom, Kings, Might |
+  | Priest, Mage, Warlock | Wisdom, Kings, Might |
 
   Warriors and Rogues never get Wisdom: no spec of theirs uses mana. Might raises melee attack
   power only, so it comes last for the classes that never fight in melee.
@@ -89,25 +90,17 @@ know. In combat it keeps the aura chosen before.
   Symbols of Kings you carry: orange at or below the warning threshold, red at 0.
 - Blessing of Sanctuary does not exist on WoW Forever.
 
-**Salvation** goes to every member whose role is not tank - the role the game reports, set by
-your group's role check; without one, a class's default, never tank. A tank carrying anyone's
-Salvation
-gets Revoke. In a raid, a class gets Mass Salvation when the members of it in range who lack
-Salvation, tanks not counted, are at least three plus the class's tanks; its tanks get Revoke
-after it. Mass Salvation costs a Symbol of Kings. Members too low for Salvation, Mass Salvation
-or Revoke - more than ten levels below the level you learned it at - are left out of it; Mass
-Salvation and Greater Blessings count only the members they reach. The highlight is the
-modern client's glow, as on a spell ready to use.
+Greater Blessings count only the members they reach. The highlight is the modern client's glow,
+as on a spell ready to use.
 
-**Both buttons** show how many casts are left; with none left, no number shows and the highlight
-stops. Hover a button to see what a left click casts next and on whom - the class for a
-Greater Blessing or Mass Salvation, the member otherwise. Dead, offline and out-of-range
-players are left out. A blessing, Salvation or Mass Salvation of yours is renewed when less
-than 5 minutes are left (see the Priorities tab); another paladin's counts until it runs out.
+**The blessing button** shows how many casts are left; with none left, no number shows and the
+highlight stops. Hover it to see what a left click casts next and on whom - the class for a
+Greater Blessing, the member otherwise. Dead, offline and out-of-range players are left out. A
+blessing of yours is renewed when less than 5 minutes are left (see the Priorities tab); another paladin's counts until it runs out.
 
 **In combat** the game hides who has which buff - in instances and PvP often out of combat
-too; the bar then behaves as in combat until the game shows them again. The blessing and Salvation buttons keep the
-cast that was first when the fight started - a Greater Blessing or Mass Salvation that would be
+too; the bar then behaves as in combat until the game shows them again. The blessing button keeps the
+cast that was first when the fight started - a Greater Blessing that would be
 followed by casts that cannot happen in combat waits for the end of it; if nothing else is
 left, the button keeps its number without the highlight, and its tooltip says so. Once a
 button's spell is cast in the fight, its highlight goes out; clicking again casts it again.
@@ -128,7 +121,7 @@ closes when combat starts and opens again when combat ends. Every change takes e
 - Border on or off; beside it **Show anchor**, on by default: the handle stays visible - off,
   it shows only under the mouse. The background color with its opacity.
 - Orientation (horizontal or vertical) and the direction the bar grows.
-- **Demo mode**: plans a blessing and Salvation for every class, each with its default role,
+- **Demo mode**: plans a blessing for every class, each with its default role,
   shows a sample Symbol count, and treats every aura and blessing as learned. Clicks cast
   nothing; the chat says what would be cast. The overview shows a made-up raid of 40 instead
   of your group. Demo mode is off after every login and cannot be switched in combat.
@@ -139,9 +132,8 @@ closes when combat starts and opens again when combat ends. Every change takes e
 
 **Tracking**
 - Aura and Righteous Fury: show the button or not, the highlight's color and its speed.
-- Blessings: show the button or not, the highlight's color and speed, and the color of the
-  count on the blessing and Salvation buttons.
-- Salvation: show the button or not, the highlight's color and its speed.
+- Blessings: show the button or not, the highlight's color and speed, and the color of its
+  count.
 
 **Supplies**
 - Symbol of Kings: the warning threshold (0 = no warning) and the warning and empty colors of
@@ -151,8 +143,7 @@ closes when combat starts and opens again when combat ends. Every change takes e
   The chat says what was bought and what it cost.
 
 **Priorities** - a middle click on the minimap button opens the window here.
-- Renew with less than this many minutes left (0 = once run out), side by side: blessings and
-  Salvation, 0 to 15, 5 by default; Righteous Fury, 0 to 5, 3 by default.
+- Renew with less than this many minutes left (0 = once run out), side by side: blessings, 0 to 15, 5 by default; Righteous Fury, 0 to 5, 3 by default.
 - **Auras:** the aura list - drag an aura left or right to reorder it.
 - **Blessings:** a row per class, named in its class colour, with its priority list, in two
   columns: drag a blessing left or right to reorder it; a right click switches it off for
@@ -161,19 +152,19 @@ closes when combat starts and opens again when combat ends. Every change takes e
 - **The overview** of your group in two columns, twenty members before it scrolls: sorted by
   class, each name in its class colour, a tank or healer - the role from the game - with the
   game's role icon before the name; a name too long for its place is cut with "...". In front of a paladin's blessings
-  the aura he runs, then the blessings and the Salvation each member carries. Yours glow
+  the aura he runs, then the blessings each member carries. Yours glow
   gold; the blessing you would give him next is faint, with a "+". Members dead, offline or
   out of sight are dimmed, and so is one out of range of the blessing you would give him next. Hover an icon for the spell, who gave it - "another
   paladin" for one outside your group - and the minutes left. In demo mode it shows a made-up
   raid of 40, the same until `/reload`: all classes, four paladins with their auras, you one of
-  them, tanks and healers, a few members dimmed or without Salvation, and names from 2 to 12
+  them, tanks and healers, a few members dimmed, and names from 2 to 12
   letters, one cut and one just fitting its place.
 
 ![The Priorities tab with the class lists and the overview of demo mode's raid](.previews/01-priorities-and-group-overview.jpg)
 
 **Order**
-- Drag the rows to reorder the bar's four buttons. "Default" restores aura, Righteous Fury,
-  blessings, Salvation.
+- Drag the rows to reorder the bar's buttons. "Default" restores aura, Righteous Fury,
+  blessings.
 
 
 **Macros** - prepared; macros follow in a later version.
@@ -211,7 +202,7 @@ In a section of their own under Options > Key Bindings > SmartBlessingBar:
 
 | Key | Action |
 |---|---|
-| Cast next buff | One press, one cast: what the first highlighted button of the bar would cast, in the bar's order - the aura, Righteous Fury, your group's next blessing, its next Salvation, Mass Salvation or Revoke. |
+| Cast next buff | One press, one cast: what the first highlighted button of the bar would cast, in the bar's order - the aura, Righteous Fury, your group's next blessing. |
 | Buff & Run | The blessing button's middle click: blesses the target, then targets the next friendly player. Also with the blessing button hidden. One player per press - holding the key does not repeat it. |
 | Set priorities | Opens or closes the settings on the Priorities tab; not in combat. |
 
@@ -230,10 +221,10 @@ unless you choose another in the settings.
 | `Locales.lua` | All texts per language, locale switching |
 | `Data.lua` | Spell IDs by rank, roles and the default priority lists, defaults, the settings' schema version |
 | `Core.lua` | Paladin check, chat output, language registry, secure attributes, saved variables, demo mode |
-| `Blessings.lua` | Known spells and ranks, roles, group scan with members' buffs kept up to 10 s, what others gave, the blessing and Salvation planner, the aura choice |
+| `Blessings.lua` | Known spells and ranks, roles, group scan with members' buffs kept up to 10 s, what others gave, the blessing planner, the aura choice |
 | `Bar.lua` | Bar, handle, position and lock, layout, scale and look, Symbol count, refresh |
 | `SelfBuffs.lua` | Aura and Righteous Fury buttons and their highlight |
-| `Queue.lua` | Blessing and Salvation buttons, their queue, count and tooltip, the buff key |
+| `Queue.lua` | The blessing button, its queue, count and tooltip, the buff key |
 | `Bindings.xml` | The key bindings the game's Key Bindings offer |
 | `Demo.lua` | Demo mode's chat output and the overview's made-up raid |
 | `Overview.lua` | The overview on the Priorities tab: members by class in two columns, their auras and what they carry |

@@ -1,6 +1,6 @@
 # SmartBlessingBar
 
-**Auras, blessings and Salvation for your whole group - on one slim bar.**
+**Auras and blessings for your whole group - on one slim bar.**
 Built for **WoW Forever**. Loads for paladins only.
 
 ![SmartBlessingBar with its settings](https://raw.githubusercontent.com/ZulshiBLN/SmartBlessingBar/main/.previews/03-general-settings.jpg)
@@ -24,12 +24,13 @@ Built for **WoW Forever**. Loads for paladins only.
 
 ![Blessing button and Buff & Run](https://raw.githubusercontent.com/ZulshiBLN/SmartBlessingBar/main/.previews/02-blessing-button-buff-and-run.jpg)
 
-## 🛡️ The right aura, Fury and Salvation
+## 🛡️ The right aura and Fury
 
 - **Auras by priority:** your list decides, and an aura another paladin already runs is
   passed on to your next one.
-- **Righteous Fury** when you tank, **Salvation** for everyone else - Revoke for a tank
-  who got one by mistake.
+- **Righteous Fury** when you tank.
+
+Blizzard removed Salvation, Mass Salvation, Revoke and Blessing of Light shortly before launch. The addon hides them and shows them again by itself if the game brings them back.
 
 ## ⚖️ Your priorities, per class
 

@@ -30,13 +30,13 @@ Priorities tab: drag auras and blessings into the order you want for each class,
 
 Middle-click the blessing button: it blesses the player you target with his class's blessing and moves on to the next one – made for blessing passers-by in town.
 
-## 04-aura-fury-salvation.jpg
+## 04-aura-and-fury.jpg
 
-**Title:** The right aura, Fury and Salvation
+**Title:** The right aura and Fury
 
-**04 – Aura, Fury and Salvation**
+**04 – Aura and Fury**
 
-Tracking tab: show or hide the aura, Righteous Fury, blessing and Salvation buttons and set their highlight. The aura button casts the first aura on your list that no other paladin runs.
+Tracking tab: show or hide the aura, Righteous Fury and blessing buttons and set their highlight. The aura button casts the first aura on your list that no other paladin runs.
 
 ## 05-symbol-of-kings-autobuy.jpg
 
