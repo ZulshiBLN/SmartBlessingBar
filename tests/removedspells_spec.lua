@@ -130,3 +130,217 @@ describe("a spell the client no longer has", function()
         assert.are.same(order, SmartBlessingBarDB.order)
     end)
 end)
+
+local function openTab(ns, key)
+    if not ns.UI.window:IsShown() then SlashCmdList.SMARTBLESSINGBAR("") end
+    for i, page in ipairs(ns.UI.pages) do
+        if page.titleKey == key then RUNSCRIPT(ns.UI.tabs[i], "OnClick") return page end
+    end
+end
+
+local function reopen(ns, key)
+    if ns.UI.window:IsShown() then SlashCmdList.SMARTBLESSINGBAR("") end
+    return openTab(ns, key)
+end
+
+local function rowOf(ns, class)
+    for _, r in ipairs(ns.UI.controls.listRows) do
+        if r.class == class then return r end
+    end
+end
+
+-- The families a row shows, from its shown icons
+local function families(r)
+    local out = {}
+    for _, icon in ipairs(r.icons) do
+        if icon:IsShown() then out[#out + 1] = icon.family end
+    end
+    return out
+end
+
+local function dragIcon(page, r, from, to)
+    local LEFT, ICON = 300, 24 + 6
+    r.icons[1].left = LEFT
+    STATE.mouseDown = true
+    RUNSCRIPT(r.icons[from], "OnMouseDown", "LeftButton")
+    STATE.cursor = { LEFT + (to - 1) * ICON + ICON / 2, 0 }
+    RUNSCRIPT(page, "OnUpdate", 0.01)
+    STATE.mouseDown = false
+    RUNSCRIPT(r.icons[from], "OnMouseUp", "LeftButton")
+end
+
+local function dragRow(ns, page, from, to)
+    local ROW, TOP = 26 + 2, 1000
+    local rows = ns.UI.controls.orderRows
+    rows[1].top = TOP
+    STATE.mouseDown = true
+    RUNSCRIPT(rows[from], "OnMouseDown", "LeftButton")
+    STATE.cursor = { 0, TOP - (to - 1) * ROW - ROW / 2 }
+    RUNSCRIPT(page, "OnUpdate", 0.01)
+    STATE.mouseDown = false
+    RUNSCRIPT(rows[from], "OnMouseUp", "LeftButton")
+end
+
+describe("the settings without a spell the client no longer has", function()
+    it("hide Salvation on the Tracking tab, and show it again at the next opening", function()
+        local ns = login(raid(), true)
+        local c = ns.UI.controls
+        openTab(ns, "TAB_TRACKING")
+        assert.is_false(c.salvationHeader:IsShown())
+        assert.is_false(c.showSalvation:GetParent():IsShown())
+        assert.is_false(c.salvationSpeed:GetParent():IsShown())
+        for _, line in ipairs(c.salvationLine) do assert.is_false(line:IsShown()) end
+        STATE.removed = nil
+        reopen(ns, "TAB_TRACKING")
+        assert.is_true(c.salvationHeader:IsShown())
+        assert.is_true(c.showSalvation:GetParent():IsShown())
+        assert.is_true(c.salvationSpeed:GetParent():IsShown())
+        for _, line in ipairs(c.salvationLine) do assert.is_true(line:IsShown()) end
+    end)
+
+    it("name blessings alone in the renew label, and Salvation again once it returns", function()
+        local ns = login(raid(), true)
+        local label = ns.UI.controls.renewRow.label
+        openTab(ns, "TAB_PRIORITIES")
+        assert.are.equal(ns.L.BTN_BLESSINGS, label:GetText())
+        STATE.removed = nil
+        reopen(ns, "TAB_PRIORITIES")
+        assert.are.equal(ns.L.RENEW_BLESSINGS:format("spell" .. D.SALVATION), label:GetText())
+    end)
+
+    it("hide its row on the Order tab, and a drag keeps its saved index", function()
+        local ns = login(raid({ db = { dbVersion = 12, order = { "AURA", "SALVATION", "FURY", "BLESSING" } } }), true)
+        local page = openTab(ns, "TAB_ORDER")
+        local rows = ns.UI.controls.orderRows
+        assert.is_true(rows[3]:IsShown())
+        assert.is_false(rows[4]:IsShown())
+        assert.are.equal(ns.L.BTN_BLESSINGS, rows[3].label:GetText())
+        dragRow(ns, page, 1, 3)
+        assert.are.same({ "FURY", "SALVATION", "BLESSING", "AURA" }, SmartBlessingBarDB.order)
+        assert.are.same({ "FURY", "BLESSING", "AURA" }, shownButtons(ns))
+        STATE.removed = nil
+        reopen(ns, "TAB_ORDER")
+        assert.is_true(rows[4]:IsShown())
+    end)
+
+    it("leave it out of the report's areas", function()
+        local ns = login(raid(), true)
+        for _, key in ipairs(ns.ReportAreas()) do assert.are_not.equal("SALVATION", key) end
+        STATE.removed = nil
+        local found = false
+        for _, key in ipairs(ns.ReportAreas()) do found = found or key == "SALVATION" end
+        assert.is_true(found)
+    end)
+
+    it("show no Light on a class row, and it returns at its old place", function()
+        local ns = login(raid(), true)
+        openTab(ns, "TAB_PRIORITIES")
+        assert.are.same({ "WISDOM", "KINGS", "MIGHT" }, families(rowOf(ns, "PRIEST")))
+        assert.are.same({ "MIGHT", "KINGS" }, families(rowOf(ns, "WARRIOR")))
+        STATE.removed = nil
+        reopen(ns, "TAB_PRIORITIES")
+        assert.are.same({ "WISDOM", "KINGS", "LIGHT", "MIGHT" }, families(rowOf(ns, "PRIEST")))
+    end)
+
+    it("keep the aura row whole", function()
+        local ns = login(raid(), true)
+        openTab(ns, "TAB_PRIORITIES")
+        assert.are.same(D.AURA_ORDER, families(ns.UI.controls.auraRow))
+    end)
+
+    it("keep a hidden family's saved index through a drag", function()
+        local ns = login(raid(), true)
+        local page = openTab(ns, "TAB_PRIORITIES")
+        dragIcon(page, rowOf(ns, "PRIEST"), 1, 3)
+        assert.are.same({ "KINGS", "MIGHT", "LIGHT", "WISDOM" }, SmartBlessingBarDB.classLists.PRIEST.order)
+    end)
+
+    it("do not let the last existing blessing of a class be switched off", function()
+        local ns = login(raid(), true)
+        openTab(ns, "TAB_PRIORITIES")
+        local r = rowOf(ns, "WARRIOR")
+        RUNSCRIPT(r.icons[1], "OnMouseUp", "RightButton")
+        assert.are.same({ "KINGS", "LIGHT" }, SmartBlessingBarDB.classLists.WARRIOR.order)
+        RUNSCRIPT(r.icons[1], "OnMouseUp", "RightButton")
+        assert.are.same({ "KINGS", "LIGHT" }, SmartBlessingBarDB.classLists.WARRIOR.order)
+    end)
+
+    it("leave a hidden family off on Enable all", function()
+        local ns = login(raid(), true)
+        openTab(ns, "TAB_PRIORITIES")
+        local list = SmartBlessingBarDB.classLists.MAGE
+        list.order, list.off = { "WISDOM", "KINGS", "MIGHT" }, { LIGHT = true }
+        RUNSCRIPT(ns.UI.controls.enableAll, "OnClick")
+        assert.is_true(list.off.LIGHT)
+        assert.are.same({ "WISDOM", "KINGS", "MIGHT" }, list.order)
+    end)
+
+    it("change nothing saved", function()
+        local ns = login(raid(), true)
+        openTab(ns, "TAB_PRIORITIES")
+        assert.are.same(ns.DefaultClassLists(), SmartBlessingBarDB.classLists)
+        assert.are.same(D.DEFAULT_ORDER, SmartBlessingBarDB.order)
+        assert.are.equal(D.DB_VERSION, SmartBlessingBarDB.dbVersion)
+        assert.are.same({}, STATE.errors)
+    end)
+end)
+
+describe("the overview without a spell the client no longer has", function()
+    local function demoRaid(gone)
+        local ns = login(raid(), gone)
+        SmartBlessingBarDB.demo = true
+        return ns, ns.DemoRaid()
+    end
+
+    it("gives demo's raid neither, and no Wisdom to a Warrior or Rogue", function()
+        local _, list = demoRaid(true)
+        assert.is_true(#list > 0)
+        for _, d in ipairs(list) do
+            assert.is_nil(d.carried.LIGHT, d.class)
+            assert.is_nil(d.carried.SALVATION, d.class)
+            assert.is_false(d.next ~= nil and d.next.family == "SALVATION")
+            if d.class == "WARRIOR" or d.class == "ROGUE" then assert.is_nil(d.carried.WISDOM, d.class) end
+        end
+    end)
+
+    it("has the fourth paladin give what a class's list holds and nobody gave", function()
+        local _, list = demoRaid(true)
+        for _, d in ipairs(list) do
+            if d.class == "PALADIN" then
+                for _, family in ipairs({ "KINGS", "MIGHT", "WISDOM" }) do
+                    assert.is_truthy(d.carried[family], family)
+                end
+            end
+        end
+    end)
+
+    it("passes a saved first Light in demo's raid", function()
+        local ns, _ = demoRaid(true)
+        SmartBlessingBarDB.classLists.MAGE.order = { "LIGHT", "WISDOM", "KINGS", "MIGHT" }
+        for _, d in ipairs(ns.DemoRaid()) do
+            if d.class == "MAGE" then
+                assert.is_nil(d.carried.LIGHT)
+                assert.is_true(d.carried.WISDOM.mine)
+            end
+        end
+    end)
+
+    it("gives Light again once it returns, per build", function()
+        local ns = demoRaid(true)
+        STATE.removed = nil
+        local found = false
+        for _, d in ipairs(ns.DemoRaid()) do found = found or d.carried.LIGHT ~= nil end
+        assert.is_true(found)
+    end)
+
+    it("gives the names the room of the two slots", function()
+        local ns = login(raid(), true)
+        openTab(ns, "TAB_PRIORITIES")
+        ns.Refresh()
+        local gone = ns.overview.rows[1].nameW
+        STATE.removed = nil
+        ns.Refresh()
+        local back = ns.overview.rows[1].nameW
+        assert.are.equal(2 * (16 + 3), gone - back) -- two slots of an icon and its gap
+    end)
+end)

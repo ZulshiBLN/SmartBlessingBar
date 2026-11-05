@@ -382,6 +382,7 @@ function UI.AddSeparator()
         local half = math.floor(w * 0.4)
         for _, tex in ipairs(halves) do PixelUtil.SetSize(tex, half, SEP_HEIGHT) end
     end
+    return halves
 end
 
 -- Dropdown with the label on the left and the selection on the right, the client's menu

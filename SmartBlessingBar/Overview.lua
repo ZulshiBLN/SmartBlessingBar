@@ -18,8 +18,12 @@ local SLOTS = { unpack(D.BLESSING_ORDER) }
 SLOTS[#SLOTS + 1] = "SALVATION"
 -- A row (Michel): 10 px, the name, 10 px, the aura, 5 px, the slots, 10 px to the column's edge
 local MARGIN, NAME_GAP, AURA_GAP = 10, 10, 5
-local SLOTS_W = #SLOTS * (ICON + ICON_GAP)
-local FIXED_W = MARGIN + NAME_GAP + ICON + AURA_GAP + SLOTS_W + MARGIN
+local FIXED_W = MARGIN + NAME_GAP + ICON + AURA_GAP + MARGIN
+-- Whether a slot's family or Salvation is in the client (ruleset plan 2026-11-05-removed-spells)
+local function SlotExists(family)
+    if family == "SALVATION" then return B.Exists(D.SALVATION) end
+    return B.FamilyExists(family)
+end
 -- A tank's or healer's role icon before the name, which moves in by its width and gap; the
 -- others' names keep the whole field (Michel, compared in game)
 local ROLE_SIZE, ROLE_GAP = 14, 2
@@ -123,14 +127,18 @@ end
 -- Places a row's parts for a column `colW` wide: the name takes what the rest leaves
 local function LayRow(row, colW)
     row:SetSize(colW, ROW_H)
-    local nameW = colW - FIXED_W
+    local placed = {}
+    for _, slot in ipairs(row.slots) do
+        slot:ClearAllPoints()
+        if SlotExists(slot.family) then placed[#placed + 1] = slot end
+    end
+    local nameW = colW - FIXED_W - #placed * (ICON + ICON_GAP)
     row.nameW = nameW -- the name's field; FillRow places the name in it, after a role icon
     local x = MARGIN + nameW + NAME_GAP
     row.aura:ClearAllPoints()
     row.aura:SetPoint("LEFT", x, 0)
     x = x + ICON + AURA_GAP
-    for s, slot in ipairs(row.slots) do
-        slot:ClearAllPoints()
+    for s, slot in ipairs(placed) do
         slot:SetPoint("LEFT", x + (s - 1) * (ICON + ICON_GAP), 0)
     end
 end

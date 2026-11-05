@@ -317,6 +317,15 @@ end
 local frame
 local MAX_TEXT = 500 -- letters of the description and of the details
 
+-- The areas a report offers: not Salvation while the client has no such spell
+function ns.ReportAreas()
+    local out = {}
+    for _, key in ipairs(D.REPORT_AREAS) do
+        if key ~= "SALVATION" or ns.Blessings.Exists(D.SALVATION) then out[#out + 1] = key end
+    end
+    return out
+end
+
 -- The text of an area: most areas are parts of the addon that already have a name
 local AREA_KEYS = { BLESSINGS = "BTN_BLESSINGS", SALVATION = "SALVATION", AURA = "TRACK_AURA",
     FURY = "RIGHTEOUS_FURY", BUFF_RUN = "BUFF_RUN", PRIORITIES = "TAB_PRIORITIES",
@@ -436,7 +445,7 @@ local function CreateWindow()
     menu:SetPoint("LEFT", where, "RIGHT", 12, 0)
     menu:SetWidth(240)
     menu:SetupMenu(function(_, root)
-        for _, key in ipairs(D.REPORT_AREAS) do
+        for _, key in ipairs(ns.ReportAreas()) do
             root:CreateRadio(ns.ReportAreaText(key), function() return frame.area == key end,
                 function() frame.SetArea(key) end)
         end

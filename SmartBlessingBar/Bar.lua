@@ -377,11 +377,15 @@ local BUTTONS = {
 }
 ns.BAR_BUTTONS = BUTTONS
 
--- Whether a button is on the bar: its setting on and, where it names one, its spell in the client
--- (ruleset plan 2026-11-05-removed-spells)
+-- Whether a button's spell is in the client, where it names one, and whether the button is on the
+-- bar: that, and its setting on (ruleset plan 2026-11-05-removed-spells)
+function ns.ButtonExists(key)
+    local spell = BUTTONS[key][3]
+    return not spell or ns.Blessings.Exists(spell())
+end
+
 function ns.ButtonShown(key)
-    local entry = BUTTONS[key]
-    return db[entry[2]] and (not entry[3] or ns.Blessings.Exists(entry[3]()))
+    return db[BUTTONS[key][2]] and ns.ButtonExists(key)
 end
 
 -- What the layout depends on; layoutKey (above ns.LoadPosition) is the last one laid out
