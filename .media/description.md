@@ -3,6 +3,28 @@
 **Auras and blessings for your whole group - on one slim bar.**
 Built for **WoW Forever**. Loads for paladins only.
 
+## 🆕 New in v1.1.0
+
+- **Ready for launch:** Blizzard removed Salvation, Mass Salvation, Revoke and Blessing of Light
+  shortly before launch. The addon hides them and shows them again by itself if the game brings
+  them back.
+- **A new bug report:** type `/sbb bug`, say what happened and paste one code into the form.
+  It filters your character, realm, guild, current group, target and focus, GUIDs, BattleTags,
+  e-mail addresses and file paths, and "Show content" shows everything it holds.
+- **Stronger blessings reach everyone:** your own weaker blessing is renewed, after you learn a
+  higher rank too.
+- **Auras that move on:** when another paladin runs the same aura as you, your button offers the
+  next one.
+- **A highlight that tells the truth:** a button's glow goes out once its spell is cast in combat.
+- **Clearer tooltips:** every tooltip lists the clicks left, middle, right, and says when everyone
+  who still needs a blessing is out of range.
+- **Buff & Run and PvP:** players flagged for PvP are blessed while you are flagged for good
+  yourself.
+- **Lighter on your game:** group members' buffs are read again only when the game reports a
+  change, or after 10 s.
+- **New settings:** Show anchor keeps the bar's handle visible, and Window background sets the
+  settings and report windows from none to solid.
+
 ![Priorities and group overview](https://raw.githubusercontent.com/ZulshiBLN/SmartBlessingBar/main/.previews/02-priorities-and-group-overview.jpg)
 
 ---
@@ -29,8 +51,6 @@ Built for **WoW Forever**. Loads for paladins only.
 - **Auras by priority:** your list decides, and an aura another paladin already runs is
   passed on to your next one.
 - **Righteous Fury** when you tank.
-
-Blizzard removed Salvation, Mass Salvation, Revoke and Blessing of Light shortly before launch. The addon hides them and shows them again by itself if the game brings them back.
 
 ## ⚖️ Your priorities, per class
 
