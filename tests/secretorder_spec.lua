@@ -31,7 +31,8 @@ local function firstTest(text, v)
     local w = "%f[%w_]" .. v .. "%f[^%w_]"
     local best
     for _, p in ipairs({ w .. "%s*[=~]=", "[=~]=%s*" .. w, "if%s+" .. w, "not%s+" .. w,
-                         "and%s+" .. w, "or%s+" .. w, w .. "%s+and", w .. "%s+or", w .. "%s+then" }) do
+                         "and%s+" .. w, "or%s+" .. w, w .. "%s+and", w .. "%s+or", w .. "%s+then",
+                         "%[" .. w .. "%]" }) do
         local at = text:find(p)
         if at and (not best or at < best) then best = at end
     end
@@ -66,6 +67,27 @@ describe("secret values", function()
         -- The overview's giver (ruleset plan 2026-10-25-rank-glow-fixes)
         assertCheckedFirst(region(source("Overview.lua"), "local function ShowIconTooltip", "^end"), "name",
             "the overview's giver")
+    end)
+
+    -- The values the API docs mark, or may mark, as secret (ruleset plan
+    -- 2026-11-05-report-filter-guards): each read goes through B.Readable or, in a named local,
+    -- is checked before its first test
+    it("are read through B.Readable, or checked first in a named local", function()
+        local NAMED = { ["local flagged = UnitIsPVP(unit)"] = true }
+        local CALLS = { "UnitIsUnit%(", "UnitClass%(", "UnitIsPVP%(", "UnitLevel%(" }
+        local text = source("Blessings.lua")
+        for line in text:gmatch("[^\r\n]+") do
+            for _, call in ipairs(CALLS) do
+                if line:find(call) and not line:find("^%s*%-%-") and not line:find("B.Readable(", 1, true) then
+                    assert.is_true(NAMED[line:match("^%s*(.-)%s*$")] == true, line)
+                end
+            end
+        end
+        assertCheckedFirst(region(text, "function B.BuffRunSpell", "^end"), "flagged", "BuffRunSpell's flag")
+        assertCheckedFirst(region(source("Queue.lua"), 'blessing:SetScript("PreClick"', "^end%)"), "started", "the cooldown")
+        local report = source("Report.lua")
+        assertCheckedFirst(region(report, "local byClass, classes", "^    end"), "class", "the group line")
+        assertCheckedFirst(region(report, "local function LevelBand", "^end"), "level", "the level band")
     end)
 
     -- The 1.1.0 review's F-05: a secret instance ID must not become a table key, and the mock

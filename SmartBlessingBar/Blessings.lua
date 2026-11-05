@@ -14,6 +14,14 @@ ns.OnDBReady(function(d) db = d end)
 local B = {}
 ns.Blessings = B
 
+-- A value the game may keep secret, or nil while it does: a truth test on a secret raises. As a
+-- precaution for what the API docs mark or may mark so (ruleset plan
+-- 2026-11-05-report-filter-guards); secret therefore reads as "no", unless a caller says otherwise
+function B.Readable(v)
+    if issecretvalue(v) then return nil end
+    return v
+end
+
 -- Whether the client lets the addon read auras now. Not in combat; and since Midnight, in
 -- instances and PvP it keeps them secret out of combat too and refuses a read with an error
 -- (BugSack, 2026-10-20). Where C_Secrets is missing, one read is tried.
@@ -220,7 +228,7 @@ end
 -- The client gives no answer for a rank the player has not learned, which demo mode counts as
 -- known: there it counts as in range, so demo mode names what it would cast
 function B.InRange(spell, unit)
-    if UnitIsUnit(unit, "player") then return true end
+    if B.Readable(UnitIsUnit(unit, "player")) then return true end
     local answer = C_Spell.IsSpellInRange(spell, unit)
     if answer == nil and ns.IsDemo() then return true end
     return answer == true
@@ -239,10 +247,10 @@ local function Learned(spell)
 end
 
 local function LevelOf(unit)
-    if not read then return UnitLevel(unit) end
+    if not read then return B.Readable(UnitLevel(unit)) end
     local level = read.level[unit]
     if level == nil then
-        level = UnitLevel(unit) or false
+        level = B.Readable(UnitLevel(unit)) or false
         read.level[unit] = level
     end
     return level or nil
@@ -276,7 +284,7 @@ end
 -- (Michel, 2026-10-19). Demo mode puts every class on the player, so it reads no role: each
 -- class shows its default.
 function B.RoleOf(unit, class)
-    local roles = D.CLASS_ROLES[class or select(2, UnitClass(unit))]
+    local roles = D.CLASS_ROLES[class or B.Readable(select(2, UnitClass(unit))) or ""]
     if not roles then return end
     if ns.IsDemo() then return roles[1] end
     local reported = UnitGroupRolesAssigned(unit)
@@ -358,7 +366,9 @@ local Symbols = B.Symbols
 -- the unit - a normal rank or the best known Greater one fits - and others have not given
 -- (ruleset plan 2026-10-19-priorities: lists by class, roles no longer choose)
 function B.ChosenFamily(unit, class)
-    for _, family in ipairs(db.classLists[class or select(2, UnitClass(unit))].order) do
+    local list = db.classLists[class or B.Readable(select(2, UnitClass(unit))) or ""]
+    if not list then return end
+    for _, family in ipairs(list.order) do
         local f = D.BLESSINGS[family]
         local greater = B.Best(f.greater)
         if (B.Best(f.normal, unit) or (greater and B.Fits(greater, unit)))
@@ -407,7 +417,7 @@ local function Roster()
     end
     for _, unit in ipairs(B.Members()) do
         -- A class without a list in Data.lua is left out: UnitClass is outside data
-        local class = select(2, UnitClass(unit))
+        local class = B.Readable(select(2, UnitClass(unit)))
         if D.CLASS_LISTS[class or ""] and B.Eligible(unit) then list[#list + 1] = { unit = unit, class = class } end
     end
     return list
@@ -577,7 +587,7 @@ function B.Describe(unit, class)
     d.visible = demo or UnitIsVisible(unit)
     if d.visible and not demo then
         for _, a in ipairs(B.Auras(unit)) do
-            if class == "PALADIN" and B.AURA_FAMILY[a.id] and a.source and UnitIsUnit(a.source, unit) then
+            if class == "PALADIN" and B.AURA_FAMILY[a.id] and a.source and B.Readable(UnitIsUnit(a.source, unit)) then
                 d.aura = { spell = a.id, source = a.source, expires = 0 }
             end
             local rank = RANKS[a.id]
@@ -603,7 +613,7 @@ end
 -- The group member a source unit token stands for, or nil when the caster is not in the group
 function B.InGroup(source)
     for _, unit in ipairs(B.Members()) do
-        if UnitIsUnit(source, unit) then return unit end
+        if B.Readable(UnitIsUnit(source, unit)) then return unit end
     end
 end
 
@@ -612,7 +622,7 @@ function B.Overview()
     if ns.IsDemo() then return ns.DemoRaid() end
     local list = {}
     for _, unit in ipairs(B.Members()) do
-        local class = select(2, UnitClass(unit))
+        local class = B.Readable(select(2, UnitClass(unit)))
         if D.CLASS_LISTS[class or ""] then list[#list + 1] = B.Describe(unit, class) end
     end
     return list
@@ -638,11 +648,12 @@ local function TakenAuras()
     local members, subgroup = B.Members(), nil
     if IsInRaid() then
         for i, unit in ipairs(members) do
-            if UnitIsUnit(unit, "player") then subgroup = select(3, GetRaidRosterInfo(i)) end
+            if B.Readable(UnitIsUnit(unit, "player")) then subgroup = select(3, GetRaidRosterInfo(i)) end
         end
     end
     for i, unit in ipairs(members) do
-        if not UnitIsUnit(unit, "player") and select(2, UnitClass(unit)) == "PALADIN" and UnitIsVisible(unit)
+        if not B.Readable(UnitIsUnit(unit, "player")) and B.Readable(select(2, UnitClass(unit))) == "PALADIN"
+           and UnitIsVisible(unit)
            and (not subgroup or select(3, GetRaidRosterInfo(i)) == subgroup) then
             -- Equal auras do not stack: while he runs mine, the game shows mine on him and hides
             -- his (ruleset plan 2026-10-22-hidden-equal-aura). My aura on him with none of his
@@ -651,11 +662,11 @@ local function TakenAuras()
             for _, a in ipairs(B.Auras(unit)) do
                 local family = AURA_FAMILY[a.id]
                 if family then
-                    if a.source and UnitIsUnit(a.source, "player") then
+                    if a.source and B.Readable(UnitIsUnit(a.source, "player")) then
                         myFamily = family
                     else
                         taken[family] = true
-                        ownShown = ownShown or (a.source ~= nil and UnitIsUnit(a.source, unit))
+                        ownShown = ownShown or (a.source ~= nil and B.Readable(UnitIsUnit(a.source, unit)))
                     end
                 end
             end
@@ -694,12 +705,14 @@ function B.BuffRunSpell(unit)
     -- 2026-10-20), or while the paladin is flagged for good - /pvp, the portrait menu, a
     -- battleground, an arena or a PvP zone - and loses nothing. A flag that runs out came by
     -- accident and does not count (Michel, 2026-10-22)
-    if UnitIsPVP(unit) and not db.pvpBlessing
-       and not (UnitIsPVP("player") and not IsPVPTimerRunning()) then
+    -- A secret answer: the target counts as flagged; the paladin does not count as flagged for good
+    local flagged = UnitIsPVP(unit)
+    if (issecretvalue(flagged) or flagged) and not db.pvpBlessing
+       and not (B.Readable(UnitIsPVP("player")) and not IsPVPTimerRunning()) then
         return
     end
     local mine, strength = MyBlessingOn(unit, true)
-    local list = db.classLists[select(2, UnitClass(unit))]
+    local list = db.classLists[B.Readable(select(2, UnitClass(unit))) or ""]
     if not list then return end
     for _, family in ipairs(list.order) do
         local spell, best = B.Best(D.BLESSINGS[family].normal, unit)

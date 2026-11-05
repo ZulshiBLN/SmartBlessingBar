@@ -105,7 +105,9 @@ blessing:SetScript("PreClick", function(_, mouseButton, down)
     local spell = B.WithRead(function() return B.BuffRunSpell("target") end)
     -- The client may answer no cooldown at all, as for a rank demo mode counts as known
     local cd = spell and C_Spell.GetSpellCooldown(spell)
-    if cd and cd.startTime > 0 then
+    local started = cd and cd.startTime
+    -- A start the game keeps secret counts as no cooldown
+    if not issecretvalue(started) and started and started > 0 then
         SetAttr(blessing, "type3", nil)
         return
     end

@@ -102,7 +102,7 @@ local function GroupLine()
     local byClass, classes = {}, {}
     for _, u in ipairs(units) do
         local _, class = UnitClass(u)
-        if class then
+        if not issecretvalue(class) and class then
             if not byClass[class] then classes[#classes + 1] = class end
             byClass[class] = (byClass[class] or 0) + 1
         end
@@ -250,7 +250,9 @@ end
 
 -- The level in a band of ten: enough for ranks, too coarse to tell a character apart
 local function LevelBand()
-    local low = math.floor((tonumber(UnitLevel("player")) or 0) / 10) * 10
+    local level = UnitLevel("player")
+    if issecretvalue(level) then level = 0 end
+    local low = math.floor((tonumber(level) or 0) / 10) * 10
     return ("%d-%d"):format(low, low + 9)
 end
 
@@ -264,6 +266,7 @@ function ns.BuildReport(form)
     if not names then return nil end
     local version, build, _, interface = GetBuildInfo()
     local _, classFile = UnitClass("player")
+    if issecretvalue(classFile) then classFile = "UNKNOWN" end
     local lines = {
         "## SmartBlessingBar bug report",
         "",
