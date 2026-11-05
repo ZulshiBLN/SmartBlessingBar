@@ -261,8 +261,10 @@ describe("the settings without a spell the client no longer has", function()
         local list = SmartBlessingBarDB.classLists.PRIEST
         list.order, list.off = { "WISDOM", "KINGS", "LIGHT" }, { MIGHT = true }
         RUNSCRIPT(ns.UI.window, "OnShow")
-        dragIcon(page, rowOf(ns, "PRIEST"), 3, 1)
-        assert.are.same({ "WISDOM", "KINGS", "LIGHT" }, list.order)
+        STATE.mouseDown = true
+        RUNSCRIPT(rowOf(ns, "PRIEST").icons[3], "OnMouseDown", "LeftButton") -- no drag starts
+        assert.is_nil(page:GetScript("OnUpdate"))
+        STATE.mouseDown = false
     end)
 
     it("show no icon for a hidden family saved as off", function()
