@@ -287,7 +287,7 @@ function B.RoleOf(unit, class)
     local roles = D.CLASS_ROLES[class or B.Readable(select(2, UnitClass(unit))) or ""]
     if not roles then return end
     if ns.IsDemo() then return roles[1] end
-    local reported = UnitGroupRolesAssigned(unit)
+    local reported = B.Readable(UnitGroupRolesAssigned(unit))
     for _, role in ipairs(roles) do
         if role == reported or (reported == "DAMAGER" and D.DAMAGE_ROLES[role]) then return role end
     end
@@ -652,7 +652,8 @@ local function TakenAuras()
         end
     end
     for i, unit in ipairs(members) do
-        if not B.Readable(UnitIsUnit(unit, "player")) and B.Readable(select(2, UnitClass(unit))) == "PALADIN"
+        -- A secret self check counts as neither: the player must not take himself for another
+        if B.Readable(UnitIsUnit(unit, "player")) == false and B.Readable(select(2, UnitClass(unit))) == "PALADIN"
            and UnitIsVisible(unit)
            and (not subgroup or select(3, GetRaidRosterInfo(i)) == subgroup) then
             -- Equal auras do not stack: while he runs mine, the game shows mine on him and hides

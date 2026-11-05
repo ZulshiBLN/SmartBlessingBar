@@ -74,15 +74,21 @@ describe("secret values", function()
     -- is checked before its first test
     it("are read through B.Readable, or checked first in a named local", function()
         local NAMED = { ["local flagged = UnitIsPVP(unit)"] = true }
-        local CALLS = { "UnitIsUnit%(", "UnitClass%(", "UnitIsPVP%(", "UnitLevel%(" }
+        local CALLS = { "UnitIsUnit%(", "UnitClass%(", "UnitIsPVP%(", "UnitLevel%(", "UnitGroupRolesAssigned%(" }
         local text = source("Blessings.lua")
-        for line in text:gmatch("[^\r\n]+") do
-            for _, call in ipairs(CALLS) do
-                if line:find(call) and not line:find("^%s*%-%-") and not line:find("B.Readable(", 1, true) then
-                    assert.is_true(NAMED[line:match("^%s*(.-)%s*$")] == true, line)
+        -- Every call on a line must itself stand directly inside B.Readable
+        local function checkFile(file)
+            for line in file:gmatch("[^\r\n]+") do
+                local rest = line:gsub("B%.Readable%(select%(2, UnitClass%(", ""):gsub("B%.Readable%(Unit%a+%(", "")
+                for _, call in ipairs(CALLS) do
+                    if rest:find(call) and not line:find("^%s*%-%-") then
+                        assert.is_true(NAMED[line:match("^%s*(.-)%s*$")] == true, line)
+                    end
                 end
             end
         end
+        checkFile(text)
+        checkFile(source("SelfBuffs.lua"))
         assertCheckedFirst(region(text, "function B.BuffRunSpell", "^end"), "flagged", "BuffRunSpell's flag")
         assertCheckedFirst(region(source("Queue.lua"), 'blessing:SetScript("PreClick"', "^end%)"), "started", "the cooldown")
         local report = source("Report.lua")

@@ -52,6 +52,35 @@ describe("a value the game keeps secret", function()
         assert.are.equal("DEVOTION", B.ChooseAura())
     end)
 
+    it("does not count the player as another paladin when the self check is secret", function()
+        local player = { class = "PALADIN", auras = { { spellId = DEVOTION, expirationTime = 0, source = "player", mine = true } } }
+        local _, B = login({ group = "raid", units = { player = player, raid1 = player } })
+        assert.are.equal("DEVOTION", B.ChooseAura())
+        local real = _G.UnitIsUnit
+        _G.UnitIsUnit = function() return "secret" end
+        STATE.secrets = { secret = true }
+        local chosen = B.ChooseAura()
+        _G.UnitIsUnit = real
+        assert.are.equal("DEVOTION", chosen)
+    end)
+
+    it("takes a class's default role when the reported role is secret", function()
+        local _, B = login({ group = "party", units = { player = { class = "PALADIN" }, party1 = { class = "WARRIOR", role = "TANK" } } })
+        assert.are.equal("TANK", B.RoleOf("party1", "WARRIOR"))
+        STATE.secrets = { TANK = true }
+        assert.are.equal("MELEE", B.RoleOf("party1", "WARRIOR"))
+    end)
+
+    it("does not take the player for a tank when his role is secret", function()
+        local ns = login({ group = "party", units = { player = { class = "PALADIN", role = "TANK" } } })
+        STATE.known[D.RIGHTEOUS_FURY] = true
+        ns.Refresh()
+        assert.is_true(ns.furyButton.antsShown)
+        STATE.secrets = { TANK = true }
+        ns.Refresh()
+        assert.is_false(ns.furyButton.antsShown)
+    end)
+
     it("counts a target's secret PvP flag as flagged", function()
         local _, B = login({ units = { player = { class = "PALADIN" }, target = { class = "MAGE" } } })
         assert.is_truthy(B.BuffRunSpell("target"))

@@ -640,7 +640,7 @@ do
     end
 
     local function StartOrderDrag(index)
-        drag = { key = RowKeys()[index], index = index }
+        drag = { index = index }
         RefreshOrder()
         orderPage:SetScript("OnUpdate", OnDragUpdate)
     end

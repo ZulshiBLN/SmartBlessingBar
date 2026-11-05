@@ -232,6 +232,47 @@ describe("the settings without a spell the client no longer has", function()
         assert.is_true(found)
     end)
 
+    it("leave it out of the report's menu itself", function()
+        local ns = login(raid(), true)
+        ns.OpenBugReport()
+        local texts = {}
+        ns.reportWindow.areaMenu.menuGen(nil, { CreateRadio = function(_, text) texts[#texts + 1] = text end })
+        assert.are.equal(#ns.ReportAreas(), #texts)
+        for _, text in ipairs(texts) do assert.are_not.equal(ns.ReportAreaText("SALVATION"), text) end
+    end)
+
+    it("do not let a drag on the Order tab run past the last row shown", function()
+        local ns = login(raid(), true)
+        local page = openTab(ns, "TAB_ORDER")
+        dragRow(ns, page, 1, 4)
+        assert.are.same({ "FURY", "BLESSING", "AURA", "SALVATION" }, SmartBlessingBarDB.order)
+    end)
+
+    it("do not let a drag on a class row run past the last family shown", function()
+        local ns = login(raid(), true)
+        local page = openTab(ns, "TAB_PRIORITIES")
+        dragIcon(page, rowOf(ns, "PRIEST"), 1, 4)
+        assert.are.same({ "KINGS", "MIGHT", "LIGHT", "WISDOM" }, SmartBlessingBarDB.classLists.PRIEST.order)
+    end)
+
+    it("do not let an icon that is off be dragged while a hidden family is on", function()
+        local ns = login(raid(), true)
+        local page = openTab(ns, "TAB_PRIORITIES")
+        local list = SmartBlessingBarDB.classLists.PRIEST
+        list.order, list.off = { "WISDOM", "KINGS", "LIGHT" }, { MIGHT = true }
+        RUNSCRIPT(ns.UI.window, "OnShow")
+        dragIcon(page, rowOf(ns, "PRIEST"), 3, 1)
+        assert.are.same({ "WISDOM", "KINGS", "LIGHT" }, list.order)
+    end)
+
+    it("show no icon for a hidden family saved as off", function()
+        local ns = login(raid(), true)
+        local list = SmartBlessingBarDB.classLists.MAGE
+        list.order, list.off = { "WISDOM", "KINGS", "MIGHT" }, { LIGHT = true }
+        openTab(ns, "TAB_PRIORITIES")
+        assert.are.same({ "WISDOM", "KINGS", "MIGHT" }, families(rowOf(ns, "MAGE")))
+    end)
+
     it("show no Light on a class row, and it returns at its old place", function()
         local ns = login(raid(), true)
         openTab(ns, "TAB_PRIORITIES")

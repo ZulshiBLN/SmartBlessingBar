@@ -54,8 +54,9 @@ Key bindings for the next buff, Buff & Run and the priorities.
 
 ## 🕯️ Found a bug?
 
-Type `/sbb bug`: the addon writes the report for you - it filters your character, realm, guild
-and current group - and shows the code and the link to the form. What a report holds and how it is handled:
+Type `/sbb bug`: the addon writes the report for you - it filters your character, realm, guild,
+current group, target and focus; friends and guild members outside the group can remain - and
+shows the code and the link to the form. What a report holds and how it is handled:
 [Privacy and security](https://github.com/ZulshiBLN/SmartBlessingBar#privacy-and-security).
 
 ---

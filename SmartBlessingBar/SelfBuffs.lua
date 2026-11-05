@@ -71,7 +71,7 @@ local function Update()
     -- check sets it; alone the game reports none (Michel, 2026-10-19). Demo mode reads no role.
     -- Hidden, it casts nothing and does not glow, as the aura button
     local known = db.showFury and B.Known(D.RIGHTEOUS_FURY)
-    local tank = not ns.IsDemo() and UnitGroupRolesAssigned("player") == "TANK"
+    local tank = not ns.IsDemo() and B.Readable(UnitGroupRolesAssigned("player")) == "TANK"
     SetSpell(fury, known and D.RIGHTEOUS_FURY or nil)
     ns.SetIcon(fury, C_Spell.GetSpellTexture(D.RIGHTEOUS_FURY), not (known and tank))
     ns.SetAnts(fury, known and tank and not FuryHolds())
