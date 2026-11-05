@@ -373,14 +373,21 @@ local BUTTONS = {
     AURA = { function() return ns.auraButton end, "showAura" },
     FURY = { function() return ns.furyButton end, "showFury" },
     BLESSING = { function() return ns.blessingButton end, "showBlessing" },
-    SALVATION = { function() return ns.salvationButton end, "showSalvation" },
+    SALVATION = { function() return ns.salvationButton end, "showSalvation", function() return D.SALVATION end },
 }
 ns.BAR_BUTTONS = BUTTONS
+
+-- Whether a button is on the bar: its setting on and, where it names one, its spell in the client
+-- (ruleset plan 2026-11-05-removed-spells)
+function ns.ButtonShown(key)
+    local entry = BUTTONS[key]
+    return db[entry[2]] and (not entry[3] or ns.Blessings.Exists(entry[3]()))
+end
 
 -- What the layout depends on; layoutKey (above ns.LoadPosition) is the last one laid out
 local function LayoutKey()
     local parts = { tostring(db.vertical), tostring(db.growRev), tostring(db.scale) }
-    for _, k in ipairs(db.order) do parts[#parts + 1] = k .. "=" .. tostring(db[BUTTONS[k][2]]) end
+    for _, k in ipairs(db.order) do parts[#parts + 1] = k .. "=" .. tostring(ns.ButtonShown(k)) end
     return table.concat(parts, ",")
 end
 
@@ -403,8 +410,8 @@ function ns.Refresh(combatStart)
         -- A hidden button leaves no gap.
         local shown = {}
         for _, k in ipairs(db.order) do
-            local b, showKey = BUTTONS[k][1](), BUTTONS[k][2]
-            if db[showKey] then
+            local b = BUTTONS[k][1]()
+            if ns.ButtonShown(k) then
                 b:Show()
                 shown[#shown + 1] = b
             else

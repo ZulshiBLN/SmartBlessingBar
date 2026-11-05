@@ -158,13 +158,32 @@ keptEvents:SetScript("OnEvent", function(_, event, unit)
     end
 end)
 
--- The one test of a known spell; in demo mode every spell counts as known
+-- Whether the client has the spell at all. Blizzard removed Salvation, Mass Salvation, Revoke and
+-- Blessing of Light shortly before launch; asked each time, so one that returns shows by itself
+-- (ruleset plan 2026-11-05-removed-spells)
+function B.Exists(id)
+    return not C_Spell.DoesSpellExist or C_Spell.DoesSpellExist(id)
+end
+
+-- Whether any normal rank of a blessing family exists
+function B.FamilyExists(family)
+    for _, id in ipairs(D.BLESSINGS[family].normal) do
+        if B.Exists(id) then return true end
+    end
+    return false
+end
+
+local function Knows(id)
+    if not B.Exists(id) then return false end
+    return ns.IsDemo() or IsPlayerSpell(id)
+end
+
+-- The one test of a known spell; in demo mode every spell the client has counts as known
 function B.Known(id)
-    if ns.IsDemo() then return true end
-    if not read then return IsPlayerSpell(id) end
+    if not read then return Knows(id) end
     local known = read.known[id]
     if known == nil then
-        known = IsPlayerSpell(id)
+        known = Knows(id)
         read.known[id] = known
     end
     return known

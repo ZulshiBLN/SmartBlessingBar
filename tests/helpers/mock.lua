@@ -589,8 +589,17 @@ C_Spell = {
     if not (STATE.known and STATE.known[id]) then return nil end
     local r = U(u) return r ~= nil and r.range ~= false
   end,
-  GetSpellTexture = function(id) return "icon" .. id end,
-  GetSpellName = function(id) return "spell" .. id end,
+  -- STATE.removed[id]: the client no longer has the spell (ruleset plan
+  -- 2026-11-05-removed-spells), as live build 70790 answers
+  DoesSpellExist = function(id) return not (STATE.removed and STATE.removed[id]) end,
+  GetSpellTexture = function(id)
+    if STATE.removed and STATE.removed[id] then return nil end
+    return "icon" .. id
+  end,
+  GetSpellName = function(id)
+    if STATE.removed and STATE.removed[id] then return nil end
+    return "spell" .. id
+  end,
   GetSpellLevelLearned = function(id) return STATE.learned and STATE.learned[id] end,
   -- STATE.gcd: the global cooldown runs, 1.5 s from GetTime
   GetSpellCooldown = function()
@@ -692,5 +701,6 @@ C_CurrencyInfo = { GetCoinTextureString = function(copper) return copper .. "c" 
 IsPlayerSpell = function(id)
   STATE.spellChecks = STATE.spellChecks or {}
   STATE.spellChecks[id] = (STATE.spellChecks[id] or 0) + 1
+  if STATE.removed and STATE.removed[id] then return false end
   return STATE.known[id] == true
 end

@@ -174,11 +174,10 @@ local ACTION = { "type1", "spell1", "unit1" }
 local function ArmBuffKey()
     local source
     for _, key in ipairs(db.order) do
-        local entry = ns.BAR_BUTTONS[key]
-        local b = entry[1]()
-        -- A hidden button's queue is empty already; asking its setting too keeps the key from
-        -- arming a button the player switched off, whatever its ants say (F-09)
-        if db[entry[2]] and b.antsShown then
+        local b = ns.BAR_BUTTONS[key][1]()
+        -- A hidden button's queue is empty already; asking too keeps the key from arming a button
+        -- that is off the bar, whatever its ants say (F-09)
+        if ns.ButtonShown(key) and b.antsShown then
             source = b
             break
         end
@@ -213,7 +212,7 @@ table.insert(ns.onSettings, function(combatStart, readable)
     -- empties its own, and the combat start still skips held entries (final release review)
     if not readable then
         Show(blessing, db.showBlessing and blessing.queue or {}, combatStart)
-        Show(salvation, db.showSalvation and salvation.queue or {}, combatStart)
+        Show(salvation, ns.ButtonShown("SALVATION") and salvation.queue or {}, combatStart)
         ArmBuffKey()
     end
     if ns.IsDemo() then
@@ -231,6 +230,6 @@ table.insert(ns.onRefresh, function(combatStart)
     if db.showBlessing then queue, symbolsUsed = B.PlanBlessings() end
     Show(blessing, queue, combatStart)
     ns.RefreshSymbols()
-    Show(salvation, db.showSalvation and B.PlanSalvation(symbolsUsed) or {}, combatStart)
+    Show(salvation, ns.ButtonShown("SALVATION") and B.PlanSalvation(symbolsUsed) or {}, combatStart)
     ArmBuffKey()
 end)
