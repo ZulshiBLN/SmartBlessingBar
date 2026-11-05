@@ -3,16 +3,8 @@
 The images in `.previews/`, in this order: for each, the title `tools/preview-title.py` puts on
 it, and the caption it gets in the CurseForge and Wago galleries (CurseForge allows at most 256
 characters). Upload the images and paste the captions by hand on both sites with each release
-whose previews change. This is the 1.1.0 set of ruleset plan 2026-10-24-store-screenshots; before
-the release its phase 4 removes every entry whose image was not taken.
-
-## 01-bar-in-a-group.jpg
-
-**Title:** Your whole group, one bar
-
-**01 – The bar at work**
-
-One slim bar for your group: the blessing button glows while someone still needs a blessing, counts how many are left, and its tooltip names who comes next.
+whose previews change. This is the 1.1.0 set of ruleset plan 2026-10-24-store-screenshots; image
+01, "Your whole group, one bar", joins it once it is taken with a party.
 
 ## 02-priorities-and-group-overview.jpg
 

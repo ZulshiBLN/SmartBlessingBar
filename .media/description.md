@@ -3,7 +3,7 @@
 **Auras and blessings for your whole group - on one slim bar.**
 Built for **WoW Forever**. Loads for paladins only.
 
-![SmartBlessingBar with its settings](https://raw.githubusercontent.com/ZulshiBLN/SmartBlessingBar/main/.previews/03-general-settings.jpg)
+![Priorities and group overview](https://raw.githubusercontent.com/ZulshiBLN/SmartBlessingBar/main/.previews/02-priorities-and-group-overview.jpg)
 
 ---
 
@@ -22,7 +22,7 @@ Built for **WoW Forever**. Loads for paladins only.
 - **Light on your game:** your group's buffs are read again only when they change, or
   every 10 s at most.
 
-![Blessing button and Buff & Run](https://raw.githubusercontent.com/ZulshiBLN/SmartBlessingBar/main/.previews/02-blessing-button-buff-and-run.jpg)
+![Blessing button and Buff & Run](https://raw.githubusercontent.com/ZulshiBLN/SmartBlessingBar/main/.previews/03-buff-and-run.jpg)
 
 ## 🛡️ The right aura and Fury
 
@@ -36,8 +36,6 @@ Blizzard removed Salvation, Mass Salvation, Revoke and Blessing of Light shortly
 
 Drag auras and blessings into the order you want for each class, switch any of them off.
 The **group overview** shows at a glance who carries what.
-
-![Priorities and group overview](https://raw.githubusercontent.com/ZulshiBLN/SmartBlessingBar/main/.previews/01-priorities-and-group-overview.jpg)
 
 ## 📜 Symbols of Kings, always in your bags
 
