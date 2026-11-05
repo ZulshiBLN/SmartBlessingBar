@@ -256,27 +256,32 @@ every file far below Lua's limit of 200 local variables per chunk.
 ### Bug reports
 
 A bug report leaves the game only when you copy its code and send it. **A GitHub issue is
-public**: everyone can read it. Write no names or personal data into the form's fields.
+public and appears under your GitHub name**: everyone can read it, with the addon list and play
+times beside your name. Write no names or personal data into the form's fields.
 
 - **What it holds, and why** - to find and fix the bug you report: your description, where it
   happened and your details; the addon's version and its settings (known keys only); your
   client's version, build and language; your class, level range (e.g. 30-39) and whether you are
-  solo, in a party or a raid; this addon's Lua errors of the current session with how long ago
-  they came, counted from the addon loading, and whether in combat; its last 50 actions (clicks with spell IDs and unit tokens
+  solo, in a party or a raid; the current session's Lua errors that name this addon - another
+  addon's too, if it does - with their stack lines and local values, how long ago they came,
+  counted from the addon loading, and whether in combat; its last 50 actions (clicks with spell IDs and unit tokens
   such as `party1`, combat, group size, settings changes); the state of its buttons and queues,
   your Symbols of Kings count, your group by class and your buffs by spell ID; the names and
   versions of your loaded addons, as conflicts need them.
-- **What it never holds** - chat, mail or whispers; positions or zones; date or clock time.
-  Strings the addon does not know are shown by their length only. The times are relative, but
+- **What it never collects** - chat, mail or whispers; positions or zones; date or clock time.
+  An error message is free text, though, and holds whatever its author wrote. Strings in local
+  values and settings that the addon does not know are shown by their length only. The times are relative, but
   with the time GitHub shows on your post they tell roughly when you played.
-- **What it filters out** - free text and error messages pass a filter for character, guild,
-  group and pet names the game knows right now - on Forever both of a character's names -
-  GUIDs, BattleTags, account folders, e-mail addresses, the WTF folder and file paths outside
-  `Interface/AddOns`, and characters that show nothing. Names are matched as whole words, in
-  any case for Western European (Latin-1) and basic Cyrillic letters; beside punctuation and
-  inside Chinese, Japanese or Korean text they are found too. A name you type that the game does
-  not know, one that is part of a longer word - an addon folder named after yourself, say - or
-  one in other capitals (`Ł`, Greek) can still remain. Check with "Show content".
+- **What it filters out** - free text and error messages pass a filter for your character -
+  on Forever both of its names - realm and guild, your current group, pets, target, focus and
+  mouseover, GUIDs, BattleTags, account folders, e-mail addresses, the WTF folder, absolute file
+  paths outside `Interface/AddOns`, colour, texture and link codes - of a link only its visible
+  text stays - and characters that show nothing. Names are matched as whole words, in any case
+  for Western European (Latin-1) and basic Cyrillic letters; beside punctuation and inside
+  Chinese, Japanese or Korean text they are found too. Friends, guild members outside your group
+  and anyone else who is not around, a name the game is still loading, a relative path, one that
+  is part of a longer word - an addon folder named after yourself, say - or one in other capitals
+  (`Ł`, Greek) can still remain. Check with "Show content".
 - **Where it is kept** - the action log in memory only, gone at logout; nothing is written to
   your saved variables for the report.
 - **Deletion** - see "Data protection" below.
@@ -297,7 +302,11 @@ This is not legal advice; it says how bug reports are handled.
 - **How long** - once the bug is fixed, the author removes the code, with its edit history, from
   the issue; on request earlier, or the whole issue. Copies outside GitHub - e-mail
   notifications, web archives - cannot be recalled.
-- **Your rights** - access, correction, deletion and objection, through the contact above. You
+  To read a report, the author may decode it and pass it to an AI coding assistant. Decoded
+  copies are used only to fix the bug and are deleted once it is fixed; the assistant provider's
+  own retention applies to what it receives.
+- **Your rights** - access, correction, deletion, restriction, portability and objection, through
+  the contact above. You
   may also complain to the Swiss FDPIC or to the data protection authority of your EU country.
 - **Under 16** - ask a parent before you post a report.
 - **An older version** - a report from 1.0.0 carries a "Date:" line and names of settings it

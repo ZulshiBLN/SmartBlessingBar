@@ -8,17 +8,18 @@ body:
   - type: markdown
     attributes:
       value: |
-        **This issue is public.** Everyone can read what you send here.
+        **This issue is public, under your GitHub name.** Everyone can read what you send here.
 
         In the game, type `/sbb bug` (or click "Report bug" in the settings), write what
         happened, choose where it happened, and copy the code with Ctrl+C. "Show content"
         in the window shows everything the code holds: the addon's version and settings,
         your client, class and level range, the group's size and classes, your buffs by ID
-        and the reagent count, this addon's errors, its last actions and state, and your
-        loaded addons. It is filtered for the names the game knows, GUIDs, BattleTags,
-        e-mail addresses and file paths - a name the game does not know, or one written
-        together with other letters, can remain, so check "Show content". The code is not
-        encrypted: anyone can read it.
+        and the reagent count, errors that name this addon, its last actions and state, and
+        your loaded addons. It is filtered for your character, realm and guild, your current
+        group, target and focus, GUIDs, BattleTags, e-mail addresses and absolute file paths -
+        friends, guild members outside the group or a name written together with other
+        letters can remain, so check "Show content". The code is not encrypted: anyone can
+        read it.
         See [privacy](https://github.com/ZulshiBLN/SmartBlessingBar#privacy-and-security)
         and [data protection](https://github.com/ZulshiBLN/SmartBlessingBar#data-protection).
 
@@ -36,7 +37,7 @@ body:
   - type: checkboxes
     id: consent
     attributes:
-      label: Consent
+      label: Public acknowledgement
       options:
         - label: I looked at the content ("Show content" in the game) and agree that it is public.
           required: true

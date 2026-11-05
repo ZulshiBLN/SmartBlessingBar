@@ -60,4 +60,4 @@ General settings: eleven languages switched at once, scale, window background, b
 
 **07 – Bug report**
 
-/sbb bug writes the report for you: what happened and where, this addon's errors and its last actions, with names and file paths filtered out. "Show content" shows everything the code holds.
+/sbb bug writes the report for you. It filters your character, realm, guild and current group, shows everything it holds, and gives you the code and the link to the form.

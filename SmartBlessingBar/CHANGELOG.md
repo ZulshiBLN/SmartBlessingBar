@@ -55,15 +55,18 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and v
   player's name secret: it then says "another paladin".
 - Group members' buffs, kept between reads, are checked for values the game keeps secret
   before anything else is done with them, as the game requires in combat and instances.
+- Other values the game may keep secret in an instance - who is who, a class, a level, a PvP flag,
+  the spell cooldown - are checked before they are used, so they raise no Lua error.
 
 ### Security
 
-- The bug report holds no date or clock and no settings it does not know, and filters the names
-  the game knows - both of a character's names on Forever, group, pets, target, guild - also
-  beside punctuation, in Chinese, Japanese and Korean text and in Latin-1 and Cyrillic capitals,
-  and GUIDs, BattleTags, e-mail addresses, every file path on a line and characters that show
-  nothing, from what you write and from errors. It opens out of combat only and not while a name
-  cannot be read. README explains what it holds, what can remain and how reports are handled.
+- The bug report holds no date or clock and no settings it does not know, and filters your
+  character - both of its names on Forever - realm and guild, your current group, pets, target and
+  focus, also beside punctuation, in Chinese, Japanese and Korean text and in Latin-1 and Cyrillic
+  capitals, and GUIDs, BattleTags, also at the start of a text, e-mail addresses, absolute file
+  paths, colour, texture and link codes and characters that show nothing, from what you write and
+  from errors. It opens out of combat only and not while a name cannot be read. README explains
+  what it holds, what can remain and how reports are handled.
 - The release workflows give the CurseForge and Wago uploads read rights only, and no step keeps
   GitHub's access token in the checked-out repository.
 - The CurseForge and Wago upload tokens reach only a release's own run, through a protected
