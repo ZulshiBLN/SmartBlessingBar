@@ -25,7 +25,7 @@ Built for **WoW Forever**. Loads for paladins only.
 - **New settings:** Show anchor keeps the bar's handle visible, and Window background sets the
   settings and report windows from none to solid.
 
-![Priorities and group overview](https://raw.githubusercontent.com/ZulshiBLN/SmartBlessingBar/main/.previews/02-priorities-and-group-overview.jpg)
+![The bar in a group](https://raw.githubusercontent.com/ZulshiBLN/SmartBlessingBar/main/.previews/01-bar-in-a-group.jpg)
 
 ---
 
@@ -56,6 +56,8 @@ Built for **WoW Forever**. Loads for paladins only.
 
 Drag auras and blessings into the order you want for each class, switch any of them off.
 The **group overview** shows at a glance who carries what.
+
+![Priorities and group overview](https://raw.githubusercontent.com/ZulshiBLN/SmartBlessingBar/main/.previews/02-priorities-and-group-overview.jpg)
 
 ## 📜 Symbols of Kings, always in your bags
 
