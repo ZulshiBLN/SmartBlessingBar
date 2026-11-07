@@ -4,7 +4,7 @@ A paladin blessing manager for **WoW Forever** (Classic content on the modern Re
 Interface 16001): it blesses your group by class, works around what other paladins already gave,
 and casts auras and Righteous Fury, with a modern look.
 
-![The bar and the settings' General tab with the language list](.previews/06-general-and-languages.jpg)
+![The bar in a party: the blessing button glows with its count, and its tooltip names a member](.previews/01-bar-in-a-group.jpg)
 
 Exceptions for single characters come later.
 
@@ -111,6 +111,8 @@ Everything updates when combat ends, or, in an instance, once the game shows the
 `/sbb`, a middle click on the handle, the minimap button, the AddOn menu next to the minimap,
 or the button in the game's Options > AddOns open the settings window; Escape closes it. It
 closes when combat starts and opens again when combat ends. Every change takes effect at once.
+
+![The bar and the settings' General tab with the language list](.previews/06-general-and-languages.jpg)
 
 **General**
 - Language: automatic (the client's) or any of the eleven, switched without a reload.
